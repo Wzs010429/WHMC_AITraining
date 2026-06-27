@@ -1,0 +1,50 @@
+============================================================
+Harness 演示 Prompt（8分钟，林哲栋投屏使用）
+============================================================
+
+输入 prompt：
+---
+帮我规划一个绘本：主题'春晓'，面向小学二年级，6页。
+先生成大纲等我确认
+---
+
+观察右侧工具调用日志：
+
+Step 1（1min）：观察初始调度
+  工具调用日志：
+  [Read]  .claude/skills/superpowers/brainstorming/SKILL.md
+  解说："Harness 第一个动作是 Read——读 superpowers Skill 文件。
+  它在'学习'规范。这是职责 3：调度工具。"
+
+Step 2（2min）：观察 Skill 加载 + 模型调用
+  工具调用日志：
+  [Read]  .claude/skills/superpowers/brainstorming/SKILL.md
+  [API]   DeepSeek V4 → 生成大纲
+  [Write] outline.json
+  解说："Read 之后是 API 调用——Harness 判断'规范有了，该让模型干活了'。
+  模型输出后自动 Write 文件——职责 1+2+3 一气呵成。
+  然后停了——你说'等我确认'——职责 6：执行 Hook。"
+
+Step 3（1min）：确认后继续 — LLM Loop
+  操作：回复"确认"
+  工具调用日志：
+  [API]   DeepSeek V4 → 第1页文案
+  [API]   图片 MCP → 生成第1页插图
+  [Write] page1.png
+  [API]   DeepSeek V4 → 第2页文案
+  ...（循环 6 次）
+  解说："看到循环了吗？职责 4：传递上下文——生成第 3 页时前 2 页内容自动带进 prompt。"
+
+Step 4（2min）：观察 TTS + 组装
+  工具调用日志：
+  [API]   TTS MCP → 第1页旁白 <|emotion:calm|>
+  [Write] page1.mp3
+  ...
+  [Write] picturebook.html
+  解说："TTS 通过 MCP 调用——职责 3。最后 Write HTML——全部完成触发 Hook。"
+
+Step 5（2min）：指令速查
+  1. 看右侧日志——理解 Agent 在做什么
+  2. "确认/继续/修改"——Hook 停住时这三个词最有力量
+  3. 把报错贴回去——工具调用失败不要慌
+  4. CLAUDE.md——花 5 分钟写清楚你的项目，比追最新模型有用

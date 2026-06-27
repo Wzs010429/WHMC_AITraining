@@ -1,0 +1,26 @@
+{
+  "mcpServers": {
+    "flux-image": {
+      "command": "python",
+      "args": [
+        "-m", "flux_mcp_server",
+        "--url", "http://10.x.x.x:5500/v1/images/generations"
+      ],
+      "env": {
+        "IMAGE_OUTPUT_DIR": "./picturebook_images"
+      }
+    },
+    "higgs-tts": {
+      "command": "python",
+      "args": [
+        "-m", "higgs_tts_mcp_server",
+        "--host", "localhost",
+        "--port", "8080"
+      ],
+      "env": {
+        "TTS_OUTPUT_DIR": "./picturebook_audio",
+        "DEFAULT_VOICE": "zh-CN"
+      }
+    }
+  }
+}

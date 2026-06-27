@@ -24,25 +24,25 @@
 
 ---
 
-### 第 2 页：Harness 的 7 层扩展体系
+### 第 2 页：Harness 的扩展体系 — 今天涉及的 5 层
 
 ```
-⑦ Subagents（子代理）    ← 独立上下文并行干活
-⑥ MCP Servers           ← 连接外部工具与数据源（图片 API、TTS）
-⑤ LSP（语言服务器）      ← IDE 级代码导航
-④ Plugins               ← Skills+Hooks+MCP 打包分发
-③ Skills                ← 按需加载的专业知识包（绘本 Skill）
-② Hooks                 ← 会话生命周期钩子（审核点）
-① CLAUDE.md             ← 项目上下文文件
+今天下午你会动手的 5 层：
+
+  ⑤ MCP Servers           ← 下半场：连接图片 API + TTS
+  ④ Skills                ← 上半场：用现成的 + 自己写
+  ③ Hooks                 ← 下半场：插入审核点
+  ② CLAUDE.md             ← 已接触（上午配过）
+  ① 模型本身（地板）        ← DeepSeek V4
 ────────────────────────────
-   模型本身（地板）
+  进阶（明天及以后）：Plugins / LSP / Subagents
 ```
 
 > **模型能力是地板，配置质量才是天花板。**
 >
 > 花时间把配置做好，比追最新模型版本更有实际收益。
 >
-> 初学者先把前三层做扎实：**CLAUDE.md → Hooks → Skills**。
+> 今天把核心三层做扎实：**CLAUDE.md → Hooks → Skills**。剩下的 Plugins、LSP、Subagents 是进阶内容（明天下午会涉及 Subagents）。
 
 ---
 
@@ -119,14 +119,14 @@ Harness 检查：6 页都完成了吗？→ 完成了，组装 HTML
 ```
 
 **解说**：
-- "看右侧面板——Harness 第一个动作是 `Read`。读什么？读 Skill 文件。"
-- "Harness 在'学习'——它要知道绘本规划的规范是什么。这是**职责 3：调度工具**。"
+- "看右侧面板——Harness 第一个动作是 `Read`。读什么？读 Skill 文件（superpowers 的 SKILL.md）。"
+- "Harness 在'学习'——它要知道 superpowers 的规范是什么。这是**职责 3：调度工具**。"
 
 ### Step 2（2min）：观察 Skill 加载 + 模型调用
 
 ```
 工具调用日志：
-[Read]  .claude/skills/picturebook-planner/SKILL.md
+[Read]  .claude/skills/superpowers/brainstorming/SKILL.md
 [API]   DeepSeek V4 → 生成大纲
 [Write] outline.json
 ```

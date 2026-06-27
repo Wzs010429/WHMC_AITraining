@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm *)",
+      "Bash(git *)",
+      "Bash(python *)",
+      "Bash(llama-*)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo \"[Hook提醒] AI 刚修改了文件，建议检查一下改了什么\""
+          }
+        ]
+      }
+    ]
+  }
+}
