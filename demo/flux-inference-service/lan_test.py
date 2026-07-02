@@ -4,9 +4,10 @@
 在你当前电脑上运行，测试同一局域网内的 FLUX 推理服务器。
 
 用法：
-  python lan_test.py                           # 默认测试 localhost:5500
-  python lan_test.py --url http://10.x.x.x:5500  # 指定服务器 IP
-  python lan_test.py --prompt "你的提示词"        # 自定义 prompt
+  python lan_test.py                                    # 文生图测试
+  python lan_test.py --url http://10.x.x.x:5500          # 指定服务器
+  python lan_test.py --image ./cat.jpg                   # 图生图编辑测试
+  python lan_test.py --image https://example.com/pic.jpg # 图生图（URL）
 """
 
 import argparse
@@ -46,22 +47,32 @@ def test_health(base_url: str):
         return False
 
 
-def test_submit(base_url: str, prompt: str, size: str) -> str | None:
-    """2. 提交作业"""
+def test_submit(base_url: str, prompt: str, size: str, image_path: str = None) -> str | None:
+    """2. 提交作业（支持文生图/图生图）"""
     print("\n" + "=" * 50)
     print("2️⃣  提交作业")
     print("=" * 50)
     print(f"   Prompt : {prompt}")
     print(f"   Size   : {size}")
 
+    body = {"prompt": prompt, "size": size, "response_format": "b64_json"}
+
+    # 图生图模式
+    if image_path:
+        if image_path.startswith("http://") or image_path.startswith("https://"):
+            body["image"] = image_path
+            print(f"   模式    : 🎨 图生图（URL）")
+        else:
+            with open(image_path, "rb") as f:
+                body["image"] = base64.b64encode(f.read()).decode()
+            print(f"   模式    : 🎨 图生图（{Path(image_path).name}）")
+    else:
+        print(f"   模式    : 📝 文生图")
+
     try:
         r = requests.post(
             f"{base_url}/v1/images/generations",
-            json={
-                "prompt": prompt,
-                "size": size,
-                "response_format": "b64_json",
-            },
+            json=body,
             timeout=10,
         )
         d = r.json()
@@ -159,6 +170,7 @@ def main():
     parser.add_argument("--url", default="http://localhost:5500", help="服务器地址（默认 localhost:5500）")
     parser.add_argument("--prompt", default="一只可爱的橘猫坐在窗台上看月亮，绘本插画风格，温暖色调，Chinese illustration")
     parser.add_argument("--size", default="512x512", help="图片尺寸（512x512 快一些，1024x1024 质量更高）")
+    parser.add_argument("--image", default=None, help="参考图路径或 URL（提供则进入图生图编辑模式）")
     args = parser.parse_args()
 
     base_url = args.url.rstrip("/")
@@ -182,7 +194,7 @@ def main():
         return
 
     # 2. 提交作业
-    job_id = test_submit(base_url, args.prompt, args.size)
+    job_id = test_submit(base_url, args.prompt, args.size, args.image)
     if not job_id:
         return
 

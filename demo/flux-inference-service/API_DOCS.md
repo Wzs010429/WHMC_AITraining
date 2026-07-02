@@ -30,32 +30,20 @@ modelscope download --model black-forest-labs/FLUX.2-klein-9B --local_dir ./mode
 cd ~/WHMC_AITraining/demo/flux-inference-service
 source flux-env/bin/activate
 
-# 创建 tmux 会话
 tmux new -s flux
-
-# 在 tmux 内启动
 python server.py --model-path ./models/FLUX.2-klein-9B --host 0.0.0.0 --port 5500
-
-# 看到 "✅ 模型加载完成" 后 → Ctrl+B 再按 D 断开
+# 看到 "✅ 模型加载完成" → Ctrl+B 再按 D 断开
 ```
 
 ### 1.3 日常运维
 
 ```bash
-tmux attach -s flux       # 查看日志
-                           # 在 tmux 内 Ctrl+C 可停服务
-                           # 停服务后再 python server.py ... 重新启动
-
-tmux ls                   # 列出会话
-
+tmux attach -s flux       # 查看日志，Ctrl+C 停服务后重新 python server.py ... 启动
 sudo ufw allow 5500        # 放行端口（首次需要）
-```
 
-### 1.4 更新代码
-
-```bash
+# 更新代码
 cd ~/WHMC_AITraining && git pull origin main
-# 在 tmux 内 Ctrl+C 停服务，然后 python server.py ... 重新启动
+# tmux 里 Ctrl+C → 重启服务
 ```
 
 ---
@@ -64,49 +52,29 @@ cd ~/WHMC_AITraining && git pull origin main
 
 | 端点 | 方法 | 说明 |
 |------|------|------|
-| `/health` | GET | 健康检查 |
+| `/health` | GET | 健康检查 + GPU 状态 |
 | `/v1/models` | GET | 模型列表 |
-| `/v1/images/generations` | POST | **提交作业**（异步，默认） |
-| `/v1/images/generations?sync=true` | POST | 同步生成（GPU 空闲时） |
-| `/v1/jobs/{job_id}` | GET | **查询作业结果** |
+| `/v1/images/generations` | POST | **核心接口**：文生图 / 图生图 / 多参考图 |
+| `/v1/jobs/{job_id}` | GET | 查询作业结果 |
 | `/v1/jobs` | GET | 作业列表 |
 | `/v1/jobs/{job_id}` | DELETE | 取消排队中的作业 |
-| `/v1/queue` | GET | 队列看板（HTML / JSON） |
-
-所有接口均无需鉴权（内网部署）。
+| `/v1/queue` | GET | 可视化队列看板（HTML / JSON） |
 
 ---
 
-## 三、接口详情
+## 三、核心接口：`POST /v1/images/generations`
 
-### 3.1 健康检查
+一个接口，**三种模式**，根据参数自动切换：
 
-**请求**
-
-```
-GET /health
-```
-
-**响应 200**
-
-```json
-{
-  "status": "healthy",
-  "model": "black-forest-labs/FLUX.2-klein-9B",
-  "device": "cuda",
-  "gpu_name": "NVIDIA L20",
-  "vram_total_gb": 48.0,
-  "vram_free_gb": 30.5,
-  "uptime_seconds": 3600.0,
-  "queue_length": 3,
-  "current_job": "a1b2c3d4e5f6",
-  "total_completed": 42
-}
-```
+| 模式 | 传参 | 用途 |
+|------|------|------|
+| 📝 **文生图** | 只传 `prompt` | 文字 → 图片 |
+| 🎨 **图生图编辑** | `prompt` + `image` | 文字指令修改单张图片 |
+| 🧩 **多参考图合成** | `prompt` + `images[]` | 4 张图合成一张 |
 
 ---
 
-### 3.2 提交作业（核心接口）
+### 3.1 📝 文生图（Text-to-Image）
 
 **请求**
 
@@ -115,97 +83,120 @@ POST /v1/images/generations
 Content-Type: application/json
 ```
 
-| 参数 | 类型 | 必填 | 默认值 | 说明 |
-|------|------|------|--------|------|
-| `prompt` | string | ✅ | — | 图片描述（中文/英文，最长 4000 字） |
-| `size` | string | ❌ | `1024x1024` | 图片尺寸：`512x512` / `1024x1024` / `2048x2048` |
-| `n` | int | ❌ | `1` | 生成数量（1-4） |
-| `seed` | int | ❌ | 随机 | 随机种子（同 seed 同 prompt 出同图） |
-| `num_inference_steps` | int | ❌ | `4` | 推理步数（1-50，蒸馏模型 4 步即可） |
-| `response_format` | string | ❌ | `b64_json` | 返回格式：`b64_json` |
-| `negative_prompt` | string | ❌ | — | 负向提示词 |
-
-**请求示例**
-
 ```json
 {
   "prompt": "一只橘猫坐在窗台上看月亮，绘本插画风格，温暖色调",
   "size": "1024x1024",
-  "n": 1
+  "seed": 42
 }
 ```
 
-**响应 200（异步模式，默认）**
+**参数**
+
+| 参数 | 类型 | 必填 | 默认 | 说明 |
+|------|------|------|------|------|
+| `prompt` | string | ✅ | — | 图片描述，中英文均可，最长 4000 字 |
+| `size` | string | ❌ | `1024x1024` | `512x512` / `1024x1024` / `2048x2048` |
+| `seed` | int | ❌ | 随机 | 同 seed 同 prompt 出同图 |
+| `n` | int | ❌ | `1` | 生成数量（1-4） |
+| `num_inference_steps` | int | ❌ | `4` | 推理步数（蒸馏模型 4 步足够） |
+| `guidance_scale` | float | ❌ | `1.0` | 蒸馏模型固定 1.0 |
+
+**响应（异步模式，默认）**
 
 ```json
 {
   "job_id": "a1b2c3d4e5f6",
   "status": "queued",
-  "position": 2,
-  "queue_length": 3,
-  "estimated_wait_seconds": 18,
-  "message": "作业已提交。轮询 GET /v1/jobs/a1b2c3d4e5f6 获取结果。"
+  "position": 0,
+  "queue_length": 1,
+  "estimated_wait_seconds": 0
 }
 ```
-
-| 字段 | 说明 |
-|------|------|
-| `job_id` | 作业 ID，用于后续轮询 |
-| `status` | `queued` = 排队中 |
-| `position` | 排队位置（0=正在处理） |
-| `estimated_wait_seconds` | 预估等待秒数 |
-
-**响应 200（同步模式 `?sync=true`）**
-
-```json
-{
-  "created": 1719700000,
-  "data": [
-    {
-      "b64_json": "iVBORw0KGgo...",
-      "revised_prompt": "一只橘猫坐在窗台上看月亮..."
-    }
-  ]
-}
-```
-
-> 同步模式只在 GPU 空闲时可用。GPU 正忙时返回 429。
 
 ---
 
-### 3.3 查询作业
+### 3.2 🎨 图生图编辑（Image-to-Image Editing）
+
+传入一张参考图 + 编辑指令，模型根据指令修改图片。
 
 **请求**
+
+```json
+{
+  "prompt": "把猫变成一只金色的狗，保持相同的姿势和背景",
+  "image": "iVBORw0KGgo...",
+  "size": "1024x1024"
+}
+```
+
+`image` 支持三种格式：
+- **纯 Base64**：`"iVBORw0KGgoAAAANSUhEUg..."`
+- **Data URL**：`"data:image/png;base64,iVBORw0KGgo..."`
+- **HTTP URL**：`"https://example.com/cat.png"`
+
+**prompt 写法（图生图模式）**
+
+> 用自然语言直接描述编辑需求，像对人说话一样。FLUX.2 对叙事性 prompt 响应最好。
+>
+> ✅ 好："把背景换成夜晚的星空，猫咪保持不动"
+> ✅ 好："把这只猫变成一只老虎，保持相同的姿势"
+> ❌ 差："cat → dog"（太简略）
+
+**完整示例**
+
+```json
+{
+  "prompt": "Add a wizard hat on the cat, change the background to a magical library with floating books",
+  "image": "https://example.com/cat.jpg",
+  "size": "1024x1024",
+  "seed": 42
+}
+```
+
+---
+
+### 3.3 🧩 多参考图合成（Multi-Reference）
+
+最多 4 张参考图，按自然语言指令合成。
+
+**请求**
+
+```json
+{
+  "prompt": "The person from image 1 sitting at the cafe table from image 2, with the lighting style of image 3",
+  "images": [
+    "iVBORw0KGgo...（人物照片）",
+    "https://example.com/cafe.jpg",
+    "data:image/png;base64,iVBORw0KGgo...（风格参考）"
+  ],
+  "size": "1024x1024"
+}
+```
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `images` | string[] | ✅ | 参考图数组，最多 4 张，每张支持 base64 / data URL / HTTP URL |
+
+**prompt 写法（多参考图模式）**
+
+通过序号引用图片：`image 1`、`image 2` 对应数组索引。
+
+```
+✅ "把图1中的人放到图2的咖啡馆场景里，保持图3的暖色调光影"
+✅ "Replace the background of image 1 with the landscape from image 2"
+✅ "Combine the face from image 1 with the hairstyle from image 2"
+```
+
+---
+
+## 四、查询作业
 
 ```
 GET /v1/jobs/{job_id}
 ```
 
-**响应 200 — 排队中**
-
-```json
-{
-  "job_id": "a1b2c3d4e5f6",
-  "status": "queued",
-  "prompt": "一只橘猫坐在窗台上看月亮...",
-  "position": 2,
-  "created_at": 1719700000.0
-}
-```
-
-**响应 200 — 生成中**
-
-```json
-{
-  "job_id": "a1b2c3d4e5f6",
-  "status": "processing",
-  "prompt": "一只橘猫坐在窗台上看月亮...",
-  "position": 0,
-  "started_at": 1719700010.0
-}
-```
-
-**响应 200 — 已完成**
+**响应（已完成）**
 
 ```json
 {
@@ -219,137 +210,128 @@ GET /v1/jobs/{job_id}
     "b64_json": "iVBORw0KGgo...",
     "seed": 12345678,
     "elapsed": 9.0,
-    "size": "1024x1024"
+    "size": "1024x1024",
+    "mode": "T2I"
   }
 }
 ```
 
 | 字段 | 说明 |
 |------|------|
-| `status` | `queued` → `processing` → `completed` / `failed` |
-| `result.b64_json` | **Base64 编码的 PNG 图片** |
-| `result.seed` | 生成用的随机种子 |
+| `result.b64_json` | Base64 编码的 PNG 图片 |
+| `result.mode` | 生成模式：`T2I` / `I2I` / `Multi-Ref` |
+| `result.seed` | 随机种子 |
 | `result.elapsed` | 推理耗时（秒） |
-| `result.size` | 图片尺寸 |
-
-**响应 200 — 失败**
-
-```json
-{
-  "job_id": "a1b2c3d4e5f6",
-  "status": "failed",
-  "error": "CUDA out of memory"
-}
-```
 
 ---
 
-### 3.4 队列看板
+## 五、其他接口
 
-**JSON 模式**
+### 健康检查
 
 ```
-GET /v1/queue
-Accept: application/json
+GET /health
 ```
 
 ```json
 {
+  "status": "healthy",
+  "gpu_name": "NVIDIA L20",
+  "vram_total_gb": 48.0,
+  "vram_free_gb": 30.5,
   "queue_length": 3,
-  "current_job": {
-    "job_id": "a1b2c3d4e5f6",
-    "prompt": "一只橘猫坐在窗台上看月亮...",
-    "elapsed": 5.2
-  },
-  "queued": [
-    {
-      "job_id": "b2c3d4e5f6a1",
-      "prompt": "春天的花园...",
-      "position": 1,
-      "estimated_wait_seconds": 9
-    }
-  ],
-  "avg_generation_seconds": 9.0,
   "total_completed": 42
 }
 ```
 
-**HTML 模式**（浏览器直接打开）
+### 队列看板
 
 ```
-GET /v1/queue
+GET /v1/queue               → HTML 可视化（浏览器打开）
+GET /v1/queue  Accept: application/json → JSON
 ```
 
-返回可视化看板，深色主题，每 3 秒自动刷新。
-
----
-
-### 3.5 作业列表
+### 作业列表
 
 ```
-GET /v1/jobs?status=active    # 进行中（默认）
-GET /v1/jobs?status=all       # 全部
-GET /v1/jobs?limit=10         # 最多返回条数
+GET /v1/jobs?status=active   # 进行中
+GET /v1/jobs?status=all      # 全部
 ```
 
----
-
-### 3.6 取消作业
+### 取消作业
 
 ```
 DELETE /v1/jobs/{job_id}
 ```
 
-**响应 200**
-
-```json
-{
-  "job_id": "a1b2c3d4e5f6",
-  "status": "cancelled",
-  "message": "作业已取消"
-}
-```
-
-> 只有 `queued` 状态的作业可以取消。已开始处理的作业无法取消。
+> 只有 `queued` 状态可取消。
 
 ---
 
-## 四、客户端调用示例
+## 六、客户端调用
 
-### 4.1 Python（推荐）
+### 6.1 Python — 文生图
 
 ```python
-import time
-import base64
-import requests
+import time, base64, requests
 
 BASE = "http://10.100.35.254:5500"
 
-# Step 1: 提交作业
+# 提交
 resp = requests.post(f"{BASE}/v1/images/generations", json={
     "prompt": "春天的花园里，孩子们在草地上读书，绘本插画风格",
     "size": "1024x1024"
 })
 job = resp.json()
-print(f"📝 job_id={job['job_id']}  排队位置 #{job['position']}")
 
-# Step 2: 轮询直到完成
+# 轮询
 while True:
     r = requests.get(f"{BASE}/v1/jobs/{job['job_id']}").json()
     if r["status"] == "completed":
-        img_bytes = base64.b64decode(r["result"]["b64_json"])
-        with open("output.png", "wb") as f:
-            f.write(img_bytes)
-        print(f"✅ 完成！{r['result']['elapsed']}s → output.png")
+        img = base64.b64decode(r["result"]["b64_json"])
+        with open("output.png", "wb") as f: f.write(img)
+        print(f"✅ {r['result']['elapsed']}s  mode={r['result']['mode']}")
         break
     elif r["status"] == "failed":
-        print(f"❌ {r['error']}")
-        break
-    print(f"⏳ {r['status']}… 位置 #{r.get('position', '?')}")
+        print(f"❌ {r['error']}"); break
     time.sleep(3)
 ```
 
-### 4.2 curl
+### 6.2 Python — 图生图编辑
+
+```python
+import base64, requests
+
+BASE = "http://10.100.35.254:5500"
+
+# 把本地图片编码为 base64
+with open("cat.jpg", "rb") as f:
+    img_b64 = base64.b64encode(f.read()).decode()
+
+# 提交编辑任务
+resp = requests.post(f"{BASE}/v1/images/generations", json={
+    "prompt": "Add a wizard hat on the cat, magical background",
+    "image": img_b64,
+    "size": "1024x1024"
+})
+print(resp.json())
+# → {"job_id": "...", "status": "queued", "position": 0}
+```
+
+### 6.3 Python — 多参考图合成
+
+```python
+resp = requests.post(f"{BASE}/v1/images/generations", json={
+    "prompt": "Person from image 1 sitting at the cafe from image 2",
+    "images": [
+        base64.b64encode(open("person.jpg","rb").read()).decode(),
+        "https://example.com/cafe.jpg",
+    ],
+    "size": "1024x1024"
+})
+```
+
+### 6.4 curl — 文生图
 
 ```bash
 # 提交
@@ -358,100 +340,85 @@ JOB_ID=$(curl -s -X POST http://10.100.35.254:5500/v1/images/generations \
   -d '{"prompt":"水墨画风格月亮","size":"512x512"}' \
   | python3 -c "import json,sys;print(json.load(sys.stdin)['job_id'])")
 
-# 轮询
+# 轮询 + 保存
 while true; do
   STATUS=$(curl -s http://10.100.35.254:5500/v1/jobs/$JOB_ID \
-    | python3 -c "import json,sys;print(json.load(sys.stdin)['status'])")
-  echo "状态: $STATUS"
+    | python3 -c "import json,sys;d=json.load(sys.stdin);print(d['status'])")
   [ "$STATUS" = "completed" ] || [ "$STATUS" = "failed" ] && break
   sleep 2
 done
-
-# 保存图片
 curl -s http://10.100.35.254:5500/v1/jobs/$JOB_ID | python3 -c "
 import json,base64,sys
-d=json.load(sys.stdin)
-open('output.png','wb').write(base64.b64decode(d['result']['b64_json']))
-print('✅ 已保存')
+d=json.load(sys.stdin)['result']
+open('output.png','wb').write(base64.b64decode(d['b64_json']))
+print(f'✅ {d[\"size\"]} {d[\"elapsed\"]}s mode={d[\"mode\"]}')
 "
 ```
 
-### 4.3 JavaScript（浏览器）
+### 6.5 JavaScript（浏览器）
 
 ```javascript
 const BASE = "http://10.100.35.254:5500";
 
-async function generateImage(prompt) {
-  // 提交
-  const res = await fetch(`${BASE}/v1/images/generations`, {
+async function generate(prompt, imageBase64 = null) {
+  const body = { prompt, size: "1024x1024" };
+  if (imageBase64) body.image = imageBase64;  // 图生图模式
+
+  const { job_id } = await fetch(`${BASE}/v1/images/generations`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ prompt, size: "1024x1024" }),
-  });
-  const { job_id } = await res.json();
-  console.log("job_id:", job_id);
+    body: JSON.stringify(body),
+  }).then(r => r.json());
 
-  // 轮询
   while (true) {
-    const r = await fetch(`${BASE}/v1/jobs/${job_id}`);
-    const job = await r.json();
-
+    const job = await fetch(`${BASE}/v1/jobs/${job_id}`).then(r => r.json());
     if (job.status === "completed") {
       const img = document.createElement("img");
       img.src = `data:image/png;base64,${job.result.b64_json}`;
       document.body.appendChild(img);
-      console.log("✅ 完成！");
       return;
     }
-    if (job.status === "failed") {
-      console.error("❌", job.error);
-      return;
-    }
-    console.log("⏳", job.status, "位置", job.position);
+    if (job.status === "failed") { console.error(job.error); return; }
     await new Promise(r => setTimeout(r, 3000));
   }
 }
 
-generateImage("一只橘猫看月亮");
-```
+// 文生图
+generate("一只橘猫看月亮");
 
-### 4.4 OpenAI SDK（兼容模式）
-
-```python
-from openai import OpenAI
-
-client = OpenAI(base_url="http://10.100.35.254:5500/v1", api_key="x")
-
-response = client.images.generate(
-    model="black-forest-labs/FLUX.2-klein-9B",
-    prompt="一只橘猫坐在窗台上看月亮",
-    size="1024x1024",
-    n=1,
-)
-# 注意：OpenAI SDK 下发的是同步请求，GPU 正忙时会返回 429
+// 图生图（需要先读取文件获取 base64）
+// generate("给猫戴上巫师帽", "iVBORw0KGgo...");
 ```
 
 ---
 
-## 五、状态码
+## 七、状态码
 
 | 状态码 | 说明 |
 |--------|------|
 | 200 | 成功 |
-| 400 | 请求参数错误 |
+| 400 | 参数错误（prompt 为空、images 超过 4 张等） |
 | 404 | 作业不存在 |
-| 429 | GPU 正忙（同步模式），请改用异步模式 |
+| 429 | GPU 正忙（同步模式） |
 | 500 | 服务端错误 |
 | 503 | 模型未加载 |
 
 ---
 
-## 六、推荐工作流
+## 八、推荐工作流
 
 ```
-1. 打开看板        http://10.100.35.254:5500/v1/queue  确认服务在线
-2. 提交作业        POST /v1/images/generations          拿到 job_id
-3. 轮询结果        GET  /v1/jobs/{job_id}              每 3 秒查一次
-4. 结果出来        status=completed → 解码 base64 → 保存图片
-5. 继续下一个      回到步骤 2
+1. 浏览器看板    http://10.100.35.254:5500/v1/queue    确认在线
+2. 提交作业      POST /v1/images/generations           拿到 job_id
+3. 每 3 秒轮询   GET  /v1/jobs/{job_id}
+4. status=completed → 解码 base64 → 保存/展示
 ```
+
+## 九、技术参考
+
+- 模型：`black-forest-labs/FLUX.2-klein-9B`（9B 流模型 + Qwen3 8B 文本编码器）
+- 推理步数：4 步蒸馏（Step-Distilled）
+- 默认分辨率：1024×1024，最高 2048×2048
+- 精度：BF16（~18GB 显存）
+- Pipeline：`Flux2KleinPipeline`（HuggingFace Diffusers）
+- ModelScope 模型页：`https://modelscope.cn/collections/black-forest-labs/FLUX-2-Klein`
