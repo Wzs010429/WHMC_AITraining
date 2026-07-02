@@ -12,8 +12,25 @@
 | 默认分辨率 | 1024×1024（最高 2048×2048） |
 | 精度 | BF16（~18GB 显存） |
 | 模型下载 | ModelScope / HuggingFace 镜像 |
-| API 协议 | OpenAI 兼容 `/v1/images/generations` |
+| API 协议 | OpenAI 兼容 + 异步任务队列 |
 | 许可 | 非商业用途 |
+
+### 任务队列模式（v2）
+
+多教师并发时，服务使用**异步作业队列**：
+
+```
+教师提交 → job_id（立即返回）→ 排队 → GPU推理 → 完成 → 教师轮询获取结果
+```
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/v1/images/generations` | POST | 提交作业（默认异步） |
+| `/v1/images/generations?sync=true` | POST | 同步等待（GPU空闲时可用） |
+| `/v1/jobs/{job_id}` | GET | 查询作业状态/结果 |
+| `/v1/jobs` | GET | 列出所有作业 |
+| `/v1/jobs/{job_id}` | DELETE | 取消排队中的作业 |
+| `/v1/queue` | GET | 队列看板（HTML + JSON） |
 
 ### 硬件要求
 
@@ -116,48 +133,101 @@ INFO:     Uvicorn running on http://0.0.0.0:5500
 
 ## 🧪 验证服务
 
-### 方法一：浏览器
+### 方法一：浏览器看板
 
-打开 `http://<服务器IP>:5500/docs` → Swagger 交互文档 → 点击 `POST /v1/images/generations` → "Try it out" → 填入 prompt → 执行。
+打开 `http://<服务器IP>:5500/v1/queue` → 可视化队列看板（每 3 秒自动刷新）
 
 ### 方法二：测试脚本
 
 ```bash
-# 测试本地服务
-python test_client.py
-
-# 测试远程服务器
-python test_client.py --url http://10.x.x.x:5500
-
-# 跳过图片生成（仅测试健康检查）
-python test_client.py --skip-generate
+python test_client.py                              # 异步模式（默认）
+python test_client.py --url http://10.x.x.x:5500   # 指定服务器
+python test_client.py --sync                       # 同步模式
+python test_client.py --batch                      # 批量提交测试
 ```
 
-### 方法三：curl
+### 方法三：curl — 异步作业流程
 
 ```bash
-# 健康检查
-curl http://localhost:5500/health
-
-# 生成图片（返回 Base64）
-curl -X POST http://localhost:5500/v1/images/generations \
+# 1. 提交作业
+JOB=$(curl -s -X POST http://localhost:5500/v1/images/generations \
   -H "Content-Type: application/json" \
-  -d '{
-    "model": "black-forest-labs/FLUX.2-klein-9B",
-    "prompt": "一轮圆月挂在夜空中，诗人站在窗前仰望，中国水墨画风格",
-    "size": "1024x1024",
-    "response_format": "b64_json"
-  }' | python3 -c "
-import json, base64, sys
-data = json.load(sys.stdin)
-img = base64.b64decode(data['data'][0]['b64_json'])
-with open('output.png', 'wb') as f:
-    f.write(img)
-print(f'✅ 已保存 output.png ({len(img)/1024:.0f}KB)')
+  -d '{"prompt":"一轮圆月，水墨画风格","size":"512x512"}')
+JOB_ID=$(echo $JOB | python3 -c "import json,sys;print(json.load(sys.stdin)['job_id'])")
+echo "作业ID: $JOB_ID"
+
+# 2. 轮询结果
+while true; do
+  STATUS=$(curl -s http://localhost:5500/v1/jobs/$JOB_ID | python3 -c "import json,sys;print(json.load(sys.stdin)['status'])")
+  echo "状态: $STATUS"
+  if [ "$STATUS" = "completed" ] || [ "$STATUS" = "failed" ]; then break; fi
+  sleep 2
+done
+
+# 3. 提取图片
+curl -s http://localhost:5500/v1/jobs/$JOB_ID | python3 -c "
+import json,base64,sys
+data=json.load(sys.stdin)['result']
+img=base64.b64decode(data['b64_json'])
+open('output.png','wb').write(img)
+print(f'✅ {data[\"size\"]} {data[\"elapsed\"]}s')
 "
+
+# 4. 查看队列
+curl -s -H "Accept: application/json" http://localhost:5500/v1/queue | python3 -m json.tool
 ```
 
 ---
+
+## 👥 多教师并发使用
+
+多个老师同时提交时，服务自动排队：
+
+```
+教师A ──→ job_aaa（立即返回）──┐
+教师B ──→ job_bbb（立即返回）──┤──→ [队列] ──→ GPU 逐个推理
+教师C ──→ job_ccc（立即返回）──┘
+```
+
+**关键特性：**
+- 提交即返回 `job_id`，不阻塞
+- FIFO 先进先出
+- 实时查询排队位置 + 预估等待时间
+- 可视化看板 `http://<ip>:5500/v1/queue`
+- 可取消尚未开始的作业
+
+### Python 异步调用示例
+
+```python
+import time, requests
+
+BASE = "http://10.x.x.x:5500"
+
+# 提交作业
+resp = requests.post(f"{BASE}/v1/images/generations", json={
+    "prompt": "春天的花园，绘本风格",
+    "size": "1024x1024"
+})
+job_id = resp.json()["job_id"]
+print(f"📝 {job_id} — 排队位置 {resp.json()['position']}")
+
+# 轮询直到完成
+while True:
+    r = requests.get(f"{BASE}/v1/jobs/{job_id}").json()
+    if r["status"] == "completed":
+        # 保存图片
+        import base64
+        img = base64.b64decode(r["result"]["b64_json"])
+        with open("output.png", "wb") as f: f.write(img)
+        print(f"✅ 完成！{r['result']['elapsed']}s")
+        break
+    elif r["status"] == "failed":
+        print(f"❌ {r['error']}")
+        break
+    print(f"⏳ {r['status']}… 位置 #{r.get('position', '?')}")
+    time.sleep(3)
+```
+
 
 ## 🐍 教师端调用（OpenAI SDK）
 
@@ -320,10 +390,15 @@ python server.py ...
 | 端点 | 方法 | 说明 |
 |------|------|------|
 | `/` | GET | 欢迎页 |
-| `/health` | GET | 健康检查 + GPU 显存状态 |
+| `/health` | GET | 健康检查 + GPU 显存 + 队列状态 |
 | `/v1/models` | GET | 模型列表（OpenAI 格式） |
-| `/v1/images/generations` | POST | 文生图（OpenAI 兼容） |
-| `/v1/images/generations/batch` | POST | 批量生成 |
+| `/v1/images/generations` | POST | **提交作业**（异步，默认） |
+| `/v1/images/generations?sync=true` | POST | 同步生成（GPU 空闲时） |
+| `/v1/images/generations/batch` | POST | 批量提交作业 |
+| `/v1/jobs/{job_id}` | GET | **查询作业**（完成后返回图片） |
+| `/v1/jobs` | GET | 列出作业（?status=active\|all） |
+| `/v1/jobs/{job_id}` | DELETE | 取消排队中的作业 |
+| `/v1/queue` | GET | **队列看板**（HTML / JSON） |
 | `/docs` | GET | Swagger 交互文档 |
 
 ---
