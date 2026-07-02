@@ -224,7 +224,7 @@ class JobManager:
             log.info(f"🎨 job_id={job.job_id} 开始推理 | prompt='{job.request.prompt[:50]}...'")
 
             try:
-                image, seed, elapsed = await _generate_image(job.request)
+                image, seed, elapsed, mode = await _generate_image(job.request)
 
                 buffer = io.BytesIO()
                 image.save(buffer, format="PNG", optimize=True)
@@ -235,6 +235,7 @@ class JobManager:
                     "seed": seed,
                     "elapsed": elapsed,
                     "size": f"{image.width}x{image.height}",
+                    "mode": mode,
                 }
                 job.status = "completed"
                 job.completed_at = time.time()
@@ -363,16 +364,31 @@ def verify_api_key(credentials: Optional[HTTPAuthorizationCredentials] = Depends
 # ═════════════════════════════════════════════════════════
 
 class ImageGenerationRequest(BaseModel):
+    """文生图 / 图生图 / 多参考图合成 统一请求体
+
+    三种模式：
+      - 文生图：只传 prompt
+      - 图生图：prompt + image（单张参考图 base64/URL）
+      - 多参考图：prompt + images（最多 4 张 base64/URL）
+    """
     model: str = Field(default="black-forest-labs/FLUX.2-klein-9B")
-    prompt: str = Field(..., min_length=1, max_length=4000)
-    n: int = Field(default=1, ge=1, le=4)
-    size: str = Field(default="1024x1024")
+    prompt: str = Field(..., min_length=1, max_length=4000,
+                        description="文本提示词。图生图时为编辑指令，如'把猫变成狗'")
+    # ── 图片输入（可选）──────────────────────────────
+    image: Optional[str] = Field(default=None,
+                                 description="单张参考图：base64 编码字符串 或 HTTP URL。提供后进入图生图编辑模式")
+    images: Optional[List[str]] = Field(default=None, max_length=4,
+                                        description="多张参考图（最多4张）：base64 或 URL 列表。提供后进入多参考图合成模式")
+    # ── 通用参数 ──────────────────────────────────────
+    n: int = Field(default=1, ge=1, le=4, description="生成数量（1-4）")
+    size: str = Field(default="1024x1024", description="输出尺寸：512x512 / 1024x1024 / 2048x2048")
     response_format: Literal["url", "b64_json"] = Field(default="b64_json")
     user: Optional[str] = None
-    negative_prompt: Optional[str] = Field(default=None, max_length=4000)
-    seed: Optional[int] = Field(default=None, ge=0)
-    num_inference_steps: Optional[int] = Field(default=None, ge=1, le=50)
-    guidance_scale: Optional[float] = Field(default=None, ge=0.0, le=20.0)
+    seed: Optional[int] = Field(default=None, ge=0, description="随机种子（同seed同prompt出同图）")
+    num_inference_steps: Optional[int] = Field(default=None, ge=1, le=50,
+                                               description="推理步数（蒸馏模型默认4）")
+    guidance_scale: Optional[float] = Field(default=None, ge=0.0, le=20.0,
+                                            description="引导强度（蒸馏模型固定1.0）")
 
 
 class ImageData(BaseModel):
@@ -422,8 +438,49 @@ def get_generator(device: str, seed: int):
     return torch.Generator(device="cpu").manual_seed(seed)
 
 
-async def _generate_image(request: ImageGenerationRequest) -> tuple[Image.Image, int, float]:
-    """在默认线程池中执行推理（不阻塞事件循环），返回 (image, seed, elapsed)"""
+def _load_reference_images(request: ImageGenerationRequest) -> Image.Image | List[Image.Image] | None:
+    """解析请求中的参考图，返回 PIL.Image / list / None
+
+    支持三种输入格式：
+      - 纯 base64 字符串："iVBORw0KGgo..."
+      - data URL："data:image/png;base64,iVBORw0KGgo..."
+      - HTTP URL："https://example.com/image.png"
+    """
+    if request.images:
+        # 多参考图模式（最多 4 张）
+        refs = []
+        for raw in request.images[:4]:
+            refs.append(_decode_single_image(raw))
+        log.info(f"📸 加载 {len(refs)} 张参考图（多参考图合成模式）")
+        return refs
+    elif request.image:
+        # 单参考图模式（图生图编辑）
+        ref = _decode_single_image(request.image)
+        log.info(f"📸 加载参考图（图生图编辑模式） size={ref.size}")
+        return ref
+    return None
+
+
+def _decode_single_image(raw: str) -> Image.Image:
+    """将 base64 / data URL / HTTP URL 解码为 PIL.Image"""
+    import requests as req
+
+    if raw.startswith("http://") or raw.startswith("https://"):
+        # URL 下载
+        resp = req.get(raw, timeout=30)
+        resp.raise_for_status()
+        return Image.open(io.BytesIO(resp.content)).convert("RGB")
+
+    # Base64（可能带 data:image/...;base64, 前缀）
+    b64 = raw
+    if "," in raw and "base64" in raw:
+        b64 = raw.split(",", 1)[1]
+    img_bytes = base64.b64decode(b64)
+    return Image.open(io.BytesIO(img_bytes)).convert("RGB")
+
+
+async def _generate_image(request: ImageGenerationRequest) -> tuple[Image.Image, int, float, str]:
+    """在默认线程池中执行推理，返回 (image, seed, elapsed, mode)"""
     global pipe
     if pipe is None:
         raise RuntimeError("模型未加载")
@@ -434,10 +491,16 @@ async def _generate_image(request: ImageGenerationRequest) -> tuple[Image.Image,
     device = model_info["device"]
     seed = request.seed if request.seed is not None else int(torch.randint(0, 2**31, (1,)).item())
 
+    # 解析参考图（None = 文生图，PIL.Image = 图生图，list = 多参考图）
+    ref_images = _load_reference_images(request) if request.image or request.images else None
+    mode = "T2I" if ref_images is None else ("I2I" if isinstance(ref_images, Image.Image) else "Multi-Ref")
+
     def _run():
         t0 = time.time()
         generator = get_generator(device, seed)
-        result = pipe(
+
+        # 构建 pipeline 参数
+        pipe_kwargs = dict(
             prompt=request.prompt,
             height=height,
             width=width,
@@ -445,8 +508,14 @@ async def _generate_image(request: ImageGenerationRequest) -> tuple[Image.Image,
             num_inference_steps=steps,
             generator=generator,
         )
+
+        # 图生图 / 多参考图模式：传入 image 参数
+        if ref_images is not None:
+            pipe_kwargs["image"] = ref_images
+
+        result = pipe(**pipe_kwargs)
         elapsed = round(time.time() - t0, 1)
-        return result.images[0], seed, elapsed
+        return result.images[0], seed, elapsed, mode
 
     loop = asyncio.get_event_loop()
     return await loop.run_in_executor(None, _run)
@@ -663,7 +732,7 @@ async def _sync_generate(request: ImageGenerationRequest):
     n = max(1, min(request.n, 4))
     results = []
     for i in range(n):
-        image, seed, elapsed = await _generate_image(request)
+        image, seed, elapsed, mode = await _generate_image(request)
         buffer = io.BytesIO()
         image.save(buffer, format="PNG", optimize=True)
         img_b64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
