@@ -1,0 +1,36 @@
+# ============================================================
+# FLUX.2-klein-9B 推理服务 依赖
+# ============================================================
+# 安装：
+#   pip install -r requirements.txt
+#
+# 如果 diffusers 版本太旧，从 GitHub 安装最新版：
+#   pip install git+https://github.com/huggingface/diffusers.git
+#
+# ModelScope 用户（国内推荐）：
+#   pip install modelscope
+
+# Web 框架
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+pydantic>=2.6.0
+
+# 模型推理
+diffusers>=0.32.0
+transformers>=4.46.0
+accelerate>=0.30.0
+torch>=2.4.0
+
+# 图片处理
+Pillow>=10.0.0
+
+# ModelScope（国内下载模型，可选）
+modelscope>=1.20.0
+
+# 工具
+safetensors>=0.4.0
+requests>=2.28.0
+
+# 可选：性能优化
+# xformers>=0.0.28    # 显存优化（仅 Linux）
+# bitsandbytes>=0.44  # 4-bit 量化
