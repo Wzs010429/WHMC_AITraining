@@ -579,7 +579,7 @@ async def health():
     vram_free = None
     if torch.cuda.is_available():
         gpu_name = torch.cuda.get_device_name(0)
-        total = torch.cuda.get_device_properties(0).total_mem
+        total = torch.cuda.get_device_properties(0).total_memory
         reserved = torch.cuda.memory_reserved(0)
         vram_total = total / (1024**3)
         vram_free = (total - reserved) / (1024**3)
