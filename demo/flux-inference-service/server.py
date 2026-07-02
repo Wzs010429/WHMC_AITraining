@@ -439,7 +439,6 @@ async def _generate_image(request: ImageGenerationRequest) -> tuple[Image.Image,
         generator = get_generator(device, seed)
         result = pipe(
             prompt=request.prompt,
-            negative_prompt=request.negative_prompt or "",
             height=height,
             width=width,
             guidance_scale=guidance,
