@@ -276,11 +276,11 @@ class JobManager:
             "position": self.get_position(j),
         }
         if j.result:
-            # 返回结果但不包含完整 base64（太大），调用 GET /jobs/{id} 获取完整结果
             d["result_summary"] = {
                 "seed": j.result["seed"],
                 "elapsed": j.result["elapsed"],
                 "size": j.result["size"],
+                "mode": j.result.get("mode", "T2I"),
                 "has_image": bool(j.result.get("b64_json")),
             }
         if j.error:
@@ -769,6 +769,7 @@ async def get_job(job_id: str):
             "seed": job.result["seed"],
             "elapsed": job.result["elapsed"],
             "size": job.result["size"],
+            "mode": job.result.get("mode", "T2I"),
         }
 
     if job.status == "failed":
