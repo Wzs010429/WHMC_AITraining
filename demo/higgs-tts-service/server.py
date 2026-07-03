@@ -315,8 +315,7 @@ def start_sglang(model_path: str, port: int):
     """启动 SGLang-Omni 子进程"""
     global sglang_process
     cmd = [
-        sys.executable, "-m", "sglang_omni.launch",
-        "serve",
+        "sgl-omni", "serve",
         "--model-path", model_path,
         "--port", str(port),
         "--host", "127.0.0.1",
