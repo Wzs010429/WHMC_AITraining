@@ -78,6 +78,11 @@ else:
 # 单个客户端
 # ═════════════════════════════════════════════════════════
 
+# 输出目录
+OUTPUT_DIR = Path(__file__).parent / "output"
+OUTPUT_DIR.mkdir(exist_ok=True)
+
+
 class TeacherClient:
     """模拟一位教师的完整调用流程"""
 
@@ -93,9 +98,11 @@ class TeacherClient:
         self.job_id: str = ""
         self.request_mode: str = ""
         self.prompt: str = ""
+        self.ref_name: str = ""   # 用了哪张参考图
         self.result: dict = {}
         self.success = False
         self.error: str = ""
+        self.saved_path: str = ""  # 保存路径
 
     def _pick_mode(self) -> str:
         """选模式：mixed 时随机 T2I 或 I2I"""
@@ -118,11 +125,11 @@ class TeacherClient:
         # ── 构建请求 ──
         body: dict = {"size": self.size, "response_format": "b64_json"}
         if req_mode == "i2i" and REF_IMAGES:
-            ref_name = random.choice(list(REF_IMAGES.keys()))
-            body["image"] = REF_IMAGES[ref_name]
+            self.ref_name = random.choice(list(REF_IMAGES.keys()))
+            body["image"] = REF_IMAGES[self.ref_name]
             body["prompt"] = random.choice(I2I_PROMPTS)
             self.prompt = body["prompt"]
-            self.request_mode = f"🎨I2I[{ref_name}]"
+            self.request_mode = f"🎨I2I[{self.ref_name}]"
         else:
             body["prompt"] = random.choice(T2I_PROMPTS)
             self.prompt = body["prompt"]
@@ -160,7 +167,17 @@ class TeacherClient:
                     self.success = True
                     self.result = job.get("result", {})
                     total = self.complete_time - self.start_time
-                    self._log(f"✅ 完成 总{total:.0f}s 推理{self.result.get('elapsed','?')}s")
+
+                    # 保存图片到本地
+                    if self.result.get("b64_json"):
+                        mode_tag = "i2i" if self.ref_name else "t2i"
+                        ref_tag = f"_{self.ref_name.replace('.png','')}" if self.ref_name else ""
+                        fname = f"{mode_tag}{ref_tag}_teacher{self.id:02d}_{self.job_id[:8]}.png"
+                        fpath = OUTPUT_DIR / fname
+                        fpath.write_bytes(base64.b64decode(self.result["b64_json"]))
+                        self.saved_path = str(fpath)
+
+                    self._log(f"✅ 完成 总{total:.0f}s 推理{self.result.get('elapsed','?')}s → {Path(self.saved_path).name if self.saved_path else '未保存'}")
                     return
 
                 elif status == "failed":
@@ -304,10 +321,12 @@ def main():
                 "teacher_id": c.id,
                 "mode": c.request_mode,
                 "prompt": c.prompt[:60],
+                "ref_image": c.ref_name,
                 "success": c.success,
                 "job_id": c.job_id,
                 "inference_s": c.result.get("elapsed", 0) if c.success else 0,
                 "total_wait_s": round(c.complete_time - c.start_time, 1) if c.success else 0,
+                "saved_path": c.saved_path,
                 "error": c.error,
             }
             for c in sorted(clients, key=lambda c: c.complete_time - c.start_time if c.success else 999)
@@ -316,6 +335,12 @@ def main():
     log_file = Path(f"multi_client_result_{int(time.time())}.json")
     log_file.write_text(json.dumps(log, indent=2, ensure_ascii=False))
     print(f"📄 详细日志：{log_file}")
+    print(f"📁 图片目录：{OUTPUT_DIR.resolve()}")
+    if successes:
+        refs_used = set(c.ref_name for c in successes if c.ref_name)
+        if refs_used:
+            print(f"🎨 使用参考图：{refs_used}")
+    print()
 
 
 if __name__ == "__main__":
