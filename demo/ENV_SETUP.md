@@ -54,6 +54,27 @@ pip install git+https://github.com/sgl-project/sglang-omni.git
 python -c "import torch; print('CUDA:', torch.cuda.is_available()); print('GPU:', torch.cuda.get_device_name(0))"
 ```
 
+### 完整依赖清单
+
+| 包 | 版本要求 | 来源 | 用途 |
+|------|---------|------|------|
+| `fastapi` | `>=0.110.0` | PyPI | Web 框架 |
+| `uvicorn` | `>=0.29.0` | PyPI | ASGI 服务器 |
+| `pydantic` | `>=2.6.0` | PyPI | 数据校验 |
+| `requests` | `>=2.28.0` | PyPI | HTTP 客户端 |
+| `torch` | `>=2.5.0` | **PyTorch 官方** | GPU 推理 |
+| `torchaudio` | `>=2.5.0` | **PyTorch 官方** | 音频处理（TTS） |
+| `diffusers` | `>=0.32.0` | PyPI | FLUX 文生图管道 |
+| `transformers` | `>=4.46.0` | PyPI | 模型加载（FLUX 依赖） |
+| `accelerate` | `>=0.30.0` | PyPI | 分布式推理（FLUX 依赖） |
+| `Pillow` | `>=10.0.0` | PyPI | 图片编解码 |
+| `safetensors` | `>=0.4.0` | PyPI | 模型文件格式 |
+| `modelscope` | `>=1.20.0` | PyPI | FLUX 模型下载（国内） |
+| `huggingface_hub` | `>=1.0.0` | PyPI | HF 模型下载 |
+| `sglang-omni` | — | **GitHub** | Higgs TTS 推理后端 |
+
+> ⚠️ `torch` / `torchaudio` 需要 CUDA 专用索引，`sglang-omni` 只在 GitHub 上有
+
 ---
 
 ## 四、启动服务
