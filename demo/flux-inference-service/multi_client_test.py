@@ -333,7 +333,7 @@ def main():
         ],
     }
     log_file = Path(f"multi_client_result_{int(time.time())}.json")
-    log_file.write_text(json.dumps(log, indent=2, ensure_ascii=False))
+    log_file.write_text(json.dumps(log, indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"📄 详细日志：{log_file}")
     print(f"📁 图片目录：{OUTPUT_DIR.resolve()}")
     if successes:

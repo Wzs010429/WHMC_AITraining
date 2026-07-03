@@ -398,7 +398,7 @@ class StressTest:
             },
         }
         result_file = Path(f"stress_result_{int(time.time())}.json")
-        result_file.write_text(json.dumps(out, indent=2, ensure_ascii=False))
+        result_file.write_text(json.dumps(out, indent=2, ensure_ascii=False), encoding="utf-8")
         print(f"📄 详细结果已保存：{result_file}")
 
 

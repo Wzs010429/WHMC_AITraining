@@ -372,7 +372,7 @@ def main():
     }
     import json as _json
     rp = Path(f"dynamic_result_{int(time.time())}.json")
-    rp.write_text(_json.dumps(report, indent=2, ensure_ascii=False))
+    rp.write_text(_json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"\n📄 详细报告: {rp}")
     print()
 
