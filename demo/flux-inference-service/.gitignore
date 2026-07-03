@@ -1,4 +1,5 @@
 output/
+output_dynamic/
 stress_result_*.json
 multi_client_result_*.json
 __pycache__/
