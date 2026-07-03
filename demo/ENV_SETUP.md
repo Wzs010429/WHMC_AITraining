@@ -15,14 +15,27 @@
 
 ---
 
-## 二、创建环境（二选一）
+## 二、一键安装（推荐）
 
-### 方式 A：venv（推荐，简单）
+```bash
+cd ~/WHMC_AITraining/demo
+chmod +x install.sh
+./install.sh
+```
+
+> 自动完成：创建 venv → 装依赖 → 装 PyTorch → 装 sglang-omni
+
+## 三、手动安装（如需 Conda）
+
+### 方式 A：venv
 
 ```bash
 cd ~/WHMC_AITraining/demo
 python3 -m venv demo-env
 source demo-env/bin/activate
+pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu124
+pip install git+https://github.com/sgl-project/sglang-omni.git
 ```
 
 ### 方式 B：Conda
@@ -30,23 +43,9 @@ source demo-env/bin/activate
 ```bash
 conda create -n whmc-demo python=3.10 -y
 conda activate whmc-demo
-```
-
----
-
-## 三、安装依赖
-
-```bash
-# 1. 基础依赖（fastapi, diffusers, transformers 等）
 pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
-
-# 2. PyTorch（CUDA 12.4 版）
 pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu124
-
-# 3. SGLang-Omni（Higgs TTS 后端）
-# SGLang-Omni 不在 PyPI，从 GitHub 安装
 pip install git+https://github.com/sgl-project/sglang-omni.git
-# 如果 GitHub 连不上，在能翻的机器上下载源码后 pip install /path/to/sglang-omni
 ```
 
 验证：

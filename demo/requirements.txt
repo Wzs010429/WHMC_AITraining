@@ -2,17 +2,31 @@
 # WHMC 工作坊 统一 Python 环境
 # 覆盖 FLUX 文生图 + Higgs TTS 两个服务
 # ============================================================
-# 安装：
+#
+# 一键安装（服务器）：
 #   source demo-env/bin/activate
 #   pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 #   pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu124
 #   pip install git+https://github.com/sgl-project/sglang-omni.git
+#
+# 一键安装（教师 Windows 本机，A4000）：
+#   tts-env\Scripts\activate
+#   pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+#   pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu124
+#   pip install git+https://github.com/sgl-project/sglang-omni.git
+#   （不需要 flux/diffusers 的话可以跳过，Python 会自动跳过已安装的）
 
 # ── Web 框架（共用）──────────────────────────────
 fastapi>=0.110.0
 uvicorn[standard]>=0.29.0
 pydantic>=2.6.0
 requests>=2.28.0
+
+# ── PyTorch（共用，需 CUDA 1234 索引安装）────────
+# ⚠️ 下面两行被注释是因为需要特殊的 --index-url
+#    请用上方一键安装命令中的 pip install torch torchaudio --index-url ...
+# torch>=2.5.0
+# torchaudio>=2.5.0
 
 # ── FLUX 文生图 ──────────────────────────────────
 diffusers>=0.32.0
@@ -23,8 +37,8 @@ safetensors>=0.4.0
 modelscope>=1.20.0
 
 # ── Higgs TTS ────────────────────────────────────
-# sglang-omni          ← 单独 pip install（见上方注释）
-# torch, torchaudio    ← 单独 pip install（CUDA 版本）
+# ⚠️ sglang-omni 不在 PyPI，需从 GitHub 安装
+#    pip install git+https://github.com/sgl-project/sglang-omni.git
 
 # ── 工具 ─────────────────────────────────────────
 huggingface_hub>=1.0.0
