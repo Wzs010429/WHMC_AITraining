@@ -140,10 +140,17 @@ INFO:     Uvicorn running on http://0.0.0.0:5500
 ### 方法二：测试脚本
 
 ```bash
-python test_client.py                              # 异步模式（默认）
-python test_client.py --url http://10.x.x.x:5500   # 指定服务器
-python test_client.py --sync                       # 同步模式
-python test_client.py --batch                      # 批量提交测试
+# 快速单次连通性测试
+python lan_test.py --url http://10.x.x.x:5500
+
+# 多客户端模拟（N个教师独立提交）
+python multi_client_test.py --url http://10.x.x.x:5500 --clients 15
+
+# 动态队列压测（教师随时间涌入）
+python dynamic_queue_test.py --url http://10.x.x.x:5500 --teachers 30 --duration 180
+
+# 高强度并发
+python stress_test.py --url http://10.x.x.x:5500 --jobs 50
 ```
 
 ### 方法三：curl — 异步作业流程
@@ -407,11 +414,17 @@ python server.py ...
 
 ```
 flux-inference-service/
-├── server.py          # FastAPI 推理服务（主程序）
-├── test_client.py     # 连通性测试脚本
-├── requirements.txt   # Python 依赖
-├── Dockerfile         # Docker 镜像
-├── docker-compose.yml # Docker Compose
-├── .env.example       # 环境变量模板
-└── README.md          # 本文件
+├── server.py              # FastAPI 推理服务（主程序）
+├── API_DOCS.md            # 接口文档（给调用方看）
+├── README.md              # 部署指南（给运维看）
+├── requirements.txt       # Python 依赖
+├── .gitignore             # 忽略 output/ 和 JSON 结果
+├── Dockerfile             # Docker 镜像
+├── docker-compose.yml     # Docker Compose
+├── .env.example           # 环境变量模板
+├── ref/                   # 参考图（图生图用）
+├── lan_test.py            # 快速连通性测试
+├── multi_client_test.py   # 多客户端模拟（N个独立教师）
+├── dynamic_queue_test.py  # 动态队列压测（教师随机时间涌入）
+└── stress_test.py         # 高并发压力测试
 ```
