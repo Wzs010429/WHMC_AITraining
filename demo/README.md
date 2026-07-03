@@ -24,16 +24,18 @@
 
 ## 启动所有服务
 
+> 环境配置详见 [ENV_SETUP.md](ENV_SETUP.md) — 两个服务共用一个虚拟环境
+
 ```bash
 # 终端1：FLUX 文生图
 cd ~/WHMC_AITraining/demo/flux-inference-service
-source flux-env/bin/activate
+source ../demo-env/bin/activate
 tmux new -s flux
 python server.py --model-path ./models/FLUX.2-klein-9B --host 0.0.0.0 --port 5500
 
 # 终端2：Higgs TTS
 cd ~/WHMC_AITraining/demo/higgs-tts-service
-source tts-env/bin/activate
+source ../demo-env/bin/activate
 tmux new -s tts
 python server.py --model-path ./models/higgs-audio-v3-tts-4b --host 0.0.0.0 --port 8100
 ```
