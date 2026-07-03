@@ -6,7 +6,7 @@
 #   source demo-env/bin/activate
 #   pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 #   pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu124
-#   pip install sglang-omni
+#   pip install git+https://github.com/sgl-project/sglang-omni.git
 
 # ── Web 框架（共用）──────────────────────────────
 fastapi>=0.110.0

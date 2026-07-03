@@ -44,7 +44,9 @@ pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu124
 
 # 3. SGLang-Omni（Higgs TTS 后端）
-pip install sglang-omni -i https://pypi.tuna.tsinghua.edu.cn/simple
+# SGLang-Omni 不在 PyPI，从 GitHub 安装
+pip install git+https://github.com/sgl-project/sglang-omni.git
+# 如果 GitHub 连不上，在能翻的机器上下载源码后 pip install /path/to/sglang-omni
 ```
 
 验证：
@@ -93,7 +95,9 @@ source demo-env/bin/activate
 # 3. 装包
 pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu124
-pip install sglang-omni -i https://pypi.tuna.tsinghua.edu.cn/simple
+# SGLang-Omni 不在 PyPI，从 GitHub 安装
+pip install git+https://github.com/sgl-project/sglang-omni.git
+# 如果 GitHub 连不上，在能翻的机器上下载源码后 pip install /path/to/sglang-omni
 
 # 4. 下载 FLUX 模型（ModelScope）
 pip install modelscope
