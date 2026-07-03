@@ -6,6 +6,6 @@ uvicorn[standard]>=0.29.0
 pydantic>=2.6.0
 requests>=2.28.0
 
-# SGLang-Omni（Higgs v3 后端）
-# pip install sglang-omni -i https://pypi.tuna.tsinghua.edu.cn/simple
-sglang-omni>=0.1.0
+# SGLang-Omni（Higgs v3 后端，不在 PyPI，从 GitHub 安装）
+# pip install git+https://github.com/sgl-project/sglang-omni.git
+# 如果 GitHub 连不上，clone 源码后 pip install /path/to/sglang-omni/

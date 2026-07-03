@@ -8,7 +8,7 @@ Higgs Audio v3 TTS 推理服务 — FastAPI + Job Queue
   教师 → FastAPI :8100 → Job Queue → SGLang-Omni :18100 → GPU
 
 部署：
-  1. 安装 SGLang-Omni：pip install sglang-omni
+  1. 安装 SGLang-Omni：pip install git+https://github.com/sgl-project/sglang-omni.git
   2. 下载模型到 ./models/higgs-audio-v3-tts-4b
   3. python server.py --host 0.0.0.0 --port 8100
 """
