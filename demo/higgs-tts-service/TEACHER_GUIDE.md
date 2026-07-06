@@ -58,10 +58,6 @@ pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 # CUDA 版 PyTorch（A4000 需要）
 pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu124
-
-# SGLang-Omni（从 GitHub 安装，不在 PyPI）
-# 如果 GitHub 连不上：管理员提供预下载的 sglang-omni/ 源码包
-pip install git+https://github.com/sgl-project/sglang-omni.git
 ```
 
 安装完成后验证 GPU 可用：

@@ -1,6 +1,6 @@
 # WHMC 工作坊 — 环境配置指南
 
-> ⚠️ **FLUX 和 TTS 必须分开两个虚拟环境**，因为 `sglang-omni` 和 `diffusers` 存在 `protobuf` 版本冲突无法共存。
+> FLUX 和 TTS 各自独立虚拟环境，互不干扰。
 
 ---
 
@@ -46,14 +46,13 @@ python3 -m venv tts-env
 source tts-env/bin/activate
 pip install -r requirements-tts.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 pip install torch==2.5.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cu124
-pip install git+https://github.com/sgl-project/sglang-omni.git
 ```
 
 | 包 | 来源 | 用途 |
 |------|------|------|
 | `fastapi`, `uvicorn`, `pydantic`, `requests` | PyPI | Web 框架 |
 | `torch`, `torchaudio` | PyTorch 官方 | GPU 推理 + 音频 |
-| `sglang-omni` | **GitHub** | Higgs TTS 推理后端 |
+| `transformers` | `>=5.5.0` | PyPI | Higgs 模型加载 |
 
 ---
 
