@@ -7,10 +7,8 @@ Higgs Audio v3 TTS 推理服务 — 纯 transformers 版
 部署：
   1. pip install "transformers>=5.5" torch torchaudio
   2. 模型文件放到 ./models/higgs-audio-v3-tts-4b/
-  3. 下载 bridge 文件：
-     huggingface-cli download multimodalart/higgs-audio-v3-tts-4b-transformers \
-       modeling_higgs_audio.py configuration_higgs_audio.py processing_higgs_audio.py \
-       --local-dir ./models/higgs-audio-v3-tts-4b/
+  3. Bridge 文件已预置在 models/higgs-audio-v3-tts-4b/ 中
+     （modeling_higgs_multimodal_qwen3.py + configuration_higgs_multimodal_qwen3.py）
   4. python server.py --host 0.0.0.0 --port 8100
 """
 
@@ -167,12 +165,10 @@ def load_model(model_path: str):
     log.info(f"加载模型：{model_path}")
 
     # 检查 bridge 文件
-    bridge = Path(model_path) / "modeling_higgs_audio.py"
+    bridge = Path(model_path) / "modeling_higgs_multimodal_qwen3.py"
     if not bridge.exists():
-        log.warning("Bridge 文件不存在，尝试从 HuggingFace 下载…")
-        log.warning(f"  hf download multimodalart/higgs-audio-v3-tts-4b-transformers "
-                    f"modeling_higgs_audio.py configuration_higgs_audio.py "
-                    f"processing_higgs_audio.py --local-dir {model_path}")
+        log.warning("Bridge 文件不存在！请确保 multimodalart 的 transformers bridge 文件已放入模型目录")
+        log.warning(f"  需要的文件：modeling_higgs_multimodal_qwen3.py, configuration_higgs_multimodal_qwen3.py")
 
     tok = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
     pipe = AutoModelForCausalLM.from_pretrained(
