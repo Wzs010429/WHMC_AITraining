@@ -237,13 +237,19 @@ async def _tts_inference(request: "TTSRequest") -> tuple[str, float, float]:
     def _run():
         import torchaudio
 
-        kwargs: dict = {}
+        kwargs: dict = {
+            "temperature": request.temperature,
+            "max_new_tokens": request.max_new_tokens,
+        }
+        if request.top_p is not None:
+            kwargs["top_p"] = request.top_p
+        if request.top_k is not None:
+            kwargs["top_k"] = request.top_k
 
         # 语音克隆
         if request.reference_audio_b64:
             ref_bytes = base64.b64decode(request.reference_audio_b64)
             ref_audio, ref_sr = torchaudio.load(io.BytesIO(ref_bytes))
-            # 转为单声道 24kHz（Higgs 输入格式）
             if ref_audio.shape[0] > 1:
                 ref_audio = ref_audio.mean(dim=0, keepdim=True)
             if ref_sr != model_config.sample_rate:
@@ -253,10 +259,6 @@ async def _tts_inference(request: "TTSRequest") -> tuple[str, float, float]:
             kwargs["reference_sample_rate"] = model_config.sample_rate
             if request.reference_text:
                 kwargs["reference_text"] = request.reference_text
-
-        # 速度
-        if request.speed is not None:
-            kwargs["speed"] = request.speed
 
         wav = pipe.generate_speech(request.input, tok, **kwargs)
         wav = wav.float().cpu()
@@ -282,12 +284,20 @@ async def _tts_inference(request: "TTSRequest") -> tuple[str, float, float]:
 class TTSRequest(BaseModel):
     model: str = Field(default="higgs-audio-v3-tts")
     input: str = Field(..., min_length=1, max_length=5000,
-                       description="要合成的文本。支持内联控制标签：<|emotion:joy|>, <|sfx:laughter|>")
-    voice: str = Field(default="nova")
-    speed: Optional[float] = Field(default=None, ge=0.25, le=4.0)
+                       description="要合成的文本。支持内联控制标签。")
+    # ── 生成参数 ──────────────────────────
+    temperature: float = Field(default=1.0, ge=0.0, le=2.0,
+                               description="随机性：0=固定输出，1=自然变化")
+    top_p: Optional[float] = Field(default=None, ge=0.0, le=1.0,
+                                   description="核采样阈值（0.9=保留前90%概率的token）")
+    top_k: Optional[int] = Field(default=None, ge=0,
+                                 description="Top-K 采样（50=只从前50个token选）")
+    max_new_tokens: int = Field(default=2048, ge=64, le=4096,
+                                description="最大输出token数（1秒≈25 token）")
+    # ── 语音克隆 ──────────────────────────
+    reference_audio_b64: Optional[str] = Field(default=None, description="参考音频 Base64（WAV），提供后自动克隆音色")
+    reference_text: Optional[str] = Field(default=None, description="参考音频的文本内容（提高克隆质量）")
     response_format: str = Field(default="wav")
-    reference_audio_b64: Optional[str] = Field(default=None, description="参考音频 Base64（语音克隆）")
-    reference_text: Optional[str] = Field(default=None, description="参考音频文本内容")
 
 
 class HealthResponse(BaseModel):
