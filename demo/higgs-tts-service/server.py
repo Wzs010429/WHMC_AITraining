@@ -160,22 +160,37 @@ job_manager: JobManager | None = None
 def load_model(model_path: str):
     """加载 Higgs v3 模型（纯 transformers，无 SGLang 依赖）"""
     global pipe, tok, model_config
-    from transformers import AutoModelForCausalLM, AutoTokenizer, AutoConfig
+    import importlib.util
 
     log.info(f"加载模型：{model_path}")
 
-    # 检查 bridge 文件
-    bridge = Path(model_path) / "modeling_higgs_multimodal_qwen3.py"
-    if not bridge.exists():
-        log.warning("Bridge 文件不存在！请确保 multimodalart 的 transformers bridge 文件已放入模型目录")
+    # 手动加载自定义 config/modeling 类（解决 trust_remote_code 的注册顺序问题）
+    model_dir = Path(model_path)
+    config_file = model_dir / "configuration_higgs_multimodal_qwen3.py"
+    modeling_file = model_dir / "modeling_higgs_multimodal_qwen3.py"
 
-    # 先加载自定义 config（trust_remote_code 必须在 config 层面先执行）
-    model_config = AutoConfig.from_pretrained(model_path, trust_remote_code=True)
+    if not config_file.exists():
+        raise FileNotFoundError(f"缺少 config 文件：{config_file}")
+
+    # 导入自定义 configuration 模块
+    spec = importlib.util.spec_from_file_location("higgs_config", config_file)
+    config_mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(config_mod)
+    HiggsConfig = config_mod.HiggsMultimodalQwen3Config
+
+    # 导入自定义 modeling 模块
+    spec2 = importlib.util.spec_from_file_location("higgs_modeling", modeling_file)
+    model_mod = importlib.util.module_from_spec(spec2)
+    spec2.loader.exec_module(model_mod)
+    HiggsModel = model_mod.HiggsMultimodalQwen3ForConditionalGeneration
+
+    # 用自定义类直接加载
+    from transformers import AutoTokenizer
+    model_config = HiggsConfig.from_pretrained(model_path)
     tok = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
-    pipe = AutoModelForCausalLM.from_pretrained(
+    pipe = HiggsModel.from_pretrained(
         model_path,
         config=model_config,
-        trust_remote_code=True,
         torch_dtype=torch.bfloat16,
     ).to("cuda").eval()
 
