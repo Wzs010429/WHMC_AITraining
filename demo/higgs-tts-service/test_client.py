@@ -19,13 +19,13 @@ from pathlib import Path
 try:
     import requests
 except ImportError:
-    print("❌ pip install requests")
+    print("[FAIL] pip install requests")
     sys.exit(1)
 
 
 def test_health(base_url: str) -> bool:
     print("=" * 50)
-    print("1️⃣  健康检查")
+    print("1.  健康检查")
     print("=" * 50)
     try:
         r = requests.get(f"{base_url}/health", timeout=10)
@@ -39,16 +39,16 @@ def test_health(base_url: str) -> bool:
         print(f"   已完成  : {d.get('total_completed', 0)} 个")
         return d["status"] in ("healthy", "degraded")
     except requests.exceptions.ConnectionError:
-        print(f"   ❌ 无法连接！请确认：python server.py --host 0.0.0.0 --port 8100")
+        print(f"   [FAIL] 无法连接！请确认：python server.py --host 0.0.0.0 --port 8100")
         return False
     except Exception as e:
-        print(f"   ❌ {e}")
+        print(f"   [FAIL] {e}")
         return False
 
 
 def test_submit(base_url: str, text: str, clone_path: str = None, ref_text: str = None) -> str | None:
     print("\n" + "=" * 50)
-    print("2️⃣  提交 TTS 作业")
+    print("2.  提交 TTS 作业")
     print("=" * 50)
     print(f"   文本    : {text[:60]}...")
 
@@ -59,7 +59,7 @@ def test_submit(base_url: str, text: str, clone_path: str = None, ref_text: str 
             body["reference_audio_b64"] = base64.b64encode(f.read()).decode()
         if ref_text:
             body["reference_text"] = ref_text
-        print(f"   模式    : 🎤 语音克隆 ({Path(clone_path).name})")
+        print(f"   模式    : [CLONE] 语音克隆 ({Path(clone_path).name})")
 
     try:
         r = requests.post(f"{base_url}/v1/audio/speech", json=body, timeout=10)
@@ -68,7 +68,7 @@ def test_submit(base_url: str, text: str, clone_path: str = None, ref_text: str 
                 detail = r.json().get("detail", r.text)
             except Exception:
                 detail = r.text
-            print(f"   ❌ HTTP {r.status_code}: {detail}")
+            print(f"   [FAIL] HTTP {r.status_code}: {detail}")
             return None
         d = r.json()
         job_id = d["job_id"]
@@ -77,13 +77,13 @@ def test_submit(base_url: str, text: str, clone_path: str = None, ref_text: str 
         print(f"   预计等待: ~{d.get('estimated_wait_s', '?')}s")
         return job_id
     except Exception as e:
-        print(f"   ❌ {e}")
+        print(f"   [FAIL] {e}")
         return None
 
 
 def test_poll(base_url: str, job_id: str, timeout: int = 120) -> bool:
     print("\n" + "=" * 50)
-    print("3️⃣  等待合成…")
+    print("3.  等待合成…")
     print("=" * 50)
 
     start = time.time()
@@ -95,7 +95,7 @@ def test_poll(base_url: str, job_id: str, timeout: int = 120) -> bool:
 
             if status == "completed":
                 result = d["result"]
-                print(f"\n   ✅ 合成完成！")
+                print(f"\n   [OK] 合成完成！")
                 print(f"   推理耗时 : {result['elapsed_s']}s")
                 print(f"   音频时长 : {result['duration_s']}s")
                 print(f"   总等待   : {time.time() - start:.0f}s")
@@ -104,23 +104,23 @@ def test_poll(base_url: str, job_id: str, timeout: int = 120) -> bool:
                     audio_bytes = base64.b64decode(result["audio_b64_json"])
                     out = Path(f"tts_output.wav")
                     out.write_bytes(audio_bytes)
-                    print(f"   💾 已保存 : {out} ({len(audio_bytes)/1024:.0f}KB)")
+                    print(f"   saved: 已保存 : {out} ({len(audio_bytes)/1024:.0f}KB)")
                 return True
 
             elif status == "queued":
                 elapsed = int(time.time() - start)
-                print(f"\r   ⏳ 排队中… #{d.get('position','?')} 已等{elapsed}s", end="")
+                print(f"\r   ... 排队中… #{d.get('position','?')} 已等{elapsed}s", end="")
                 time.sleep(1)
             elif status == "processing":
                 elapsed = int(time.time() - start)
-                print(f"\r   🔊 合成中… 已等{elapsed}s", end="")
+                print(f"\r   >>> 合成中… 已等{elapsed}s", end="")
                 time.sleep(1)
             elif status == "failed":
-                print(f"\n   ❌ {d.get('error')}")
+                print(f"\n   [FAIL] {d.get('error')}")
                 return False
         except Exception as e:
             time.sleep(2)
-    print(f"\n   ❌ 超时")
+    print(f"\n   [FAIL] 超时")
     return False
 
 
@@ -135,8 +135,8 @@ def main():
     base_url = args.url.rstrip("/")
 
     print()
-    print("🎙️  Higgs Audio v3 TTS 测试")
-    print(f"📍 {base_url}")
+    print("[TTS]  Higgs Audio v3 TTS 测试")
+    print(f"URL: {base_url}")
     print()
 
     if not test_health(base_url):
@@ -150,9 +150,9 @@ def main():
 
     print()
     if success:
-        print("🎉 测试通过！音频已保存为 tts_output.wav")
+        print("[PASS] 测试通过！音频已保存为 tts_output.wav")
     else:
-        print("⚠️  未通过")
+        print("[WARN]  未通过")
 
 
 if __name__ == "__main__":
