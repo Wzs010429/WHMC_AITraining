@@ -160,7 +160,7 @@ job_manager: JobManager | None = None
 def load_model(model_path: str):
     """加载 Higgs v3 模型（纯 transformers，无 SGLang 依赖）"""
     global pipe, tok, model_config
-    from transformers import AutoModelForCausalLM, AutoTokenizer
+    from transformers import AutoModelForCausalLM, AutoTokenizer, AutoConfig
 
     log.info(f"加载模型：{model_path}")
 
@@ -168,15 +168,16 @@ def load_model(model_path: str):
     bridge = Path(model_path) / "modeling_higgs_multimodal_qwen3.py"
     if not bridge.exists():
         log.warning("Bridge 文件不存在！请确保 multimodalart 的 transformers bridge 文件已放入模型目录")
-        log.warning(f"  需要的文件：modeling_higgs_multimodal_qwen3.py, configuration_higgs_multimodal_qwen3.py")
 
+    # 先加载自定义 config（trust_remote_code 必须在 config 层面先执行）
+    model_config = AutoConfig.from_pretrained(model_path, trust_remote_code=True)
     tok = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
     pipe = AutoModelForCausalLM.from_pretrained(
         model_path,
+        config=model_config,
         trust_remote_code=True,
         torch_dtype=torch.bfloat16,
     ).to("cuda").eval()
-    model_config = pipe.config
 
     log.info(f"✅ 模型加载完成 | sample_rate={model_config.sample_rate}")
 
