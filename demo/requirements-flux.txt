@@ -1,0 +1,19 @@
+# ============================================================
+# FLUX 文生图 依赖
+# ============================================================
+# 安装：
+#   source flux-env/bin/activate
+#   pip install -r requirements-flux.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+#   pip install torch --index-url https://download.pytorch.org/whl/cu124
+
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+pydantic>=2.6.0
+requests>=2.28.0
+diffusers>=0.32.0
+transformers>=4.46.0
+accelerate>=0.30.0
+Pillow>=10.0.0
+safetensors>=0.4.0
+modelscope>=1.20.0
+huggingface_hub>=1.0.0
