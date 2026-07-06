@@ -7,6 +7,8 @@ Higgs Audio v3 TTS 连通性测试
   python test_client.py --url http://10.100.35.254:8100 --clone ./reference.wav --ref-text "参考文本"
 """
 
+from __future__ import annotations
+
 import argparse
 import base64
 import json
@@ -30,7 +32,9 @@ def test_health(base_url: str) -> bool:
         d = r.json()
         print(f"   状态    : {d['status']}")
         print(f"   模型    : {d['model']}")
-        print(f"   SGLang  : {'✅' if d.get('sglang_ok') else '❌'}")
+        print(f"   后端    : {d.get('backend', 'unknown')}")
+        if d.get("error"):
+            print(f"   详情    : {d['error']}")
         print(f"   排队    : {d.get('queue_length', 0)} 个")
         print(f"   已完成  : {d.get('total_completed', 0)} 个")
         return d["status"] in ("healthy", "degraded")
@@ -59,6 +63,13 @@ def test_submit(base_url: str, text: str, clone_path: str = None, ref_text: str 
 
     try:
         r = requests.post(f"{base_url}/v1/audio/speech", json=body, timeout=10)
+        if not r.ok:
+            try:
+                detail = r.json().get("detail", r.text)
+            except Exception:
+                detail = r.text
+            print(f"   ❌ HTTP {r.status_code}: {detail}")
+            return None
         d = r.json()
         job_id = d["job_id"]
         print(f"   job_id  : {job_id}")

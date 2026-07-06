@@ -2,7 +2,7 @@
 
 面向 WHMC 工作坊的 OpenAI 兼容 TTS API。基于 Boson AI Higgs Audio v3（4B 参数），100+ 语言、零样本语音克隆、情感控制。
 
-> 服务端口：`8100` | SGLang 内部：`18100`
+> 服务端口：`8100` | 推理后端：纯 `transformers`
 
 ## 模型信息
 
@@ -13,7 +13,7 @@
 | 语言 | 100+ 语言，中文优秀 |
 | 语音克隆 | ✅ 零样本（给一段 WAV 即可克隆） |
 | 情感控制 | 21 种情感标签 + 3 种风格 + 8 种 SFX |
-| 推理后端 | SGLang-Omni |
+| 推理后端 | 纯 `transformers` |
 | API | OpenAI 兼容 `/v1/audio/speech` + 作业队列 |
 | 许可 | 非商业研究 |
 
@@ -37,6 +37,7 @@ cd ~/WHMC_AITraining/demo/higgs-tts-service
 python3 -m venv tts-env
 source tts-env/bin/activate
 pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+pip install torch==2.5.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cu124
 ```
 
 ### 2. 下载模型（二选一）
@@ -56,7 +57,6 @@ huggingface-cli download bosonai/higgs-audio-v3-tts-4b --local-dir ./models/higg
 tmux new -s tts
 source tts-env/bin/activate
 python server.py --model-path ./models/higgs-audio-v3-tts-4b --host 0.0.0.0 --port 8100
-# SGLang 会自动启动在 :18100
 # Ctrl+B D 断开
 ```
 

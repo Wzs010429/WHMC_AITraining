@@ -86,7 +86,7 @@ python server.py --model-path D:\ai-models\higgs-audio-v3-tts-4b --host 127.0.0.
 看到以下输出表示成功：
 
 ```
-✅ SGLang-Omni 就绪
+✅ 模型加载完成 | device=cuda | sample_rate=24000
 👷 Worker 已启动
 INFO:     Uvicorn running on http://127.0.0.1:8100
 ```

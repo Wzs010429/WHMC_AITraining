@@ -12,14 +12,14 @@ Higgs Audio v3 TTS 推理服务 — 纯 transformers 版
   4. python server.py --host 0.0.0.0 --port 8100
 """
 
-import io, os, sys, time, uuid, json, base64, logging, argparse, asyncio
+from __future__ import annotations
+
+import io, os, sys, time, uuid, json, base64, logging, argparse, asyncio, types
 from pathlib import Path
 from dataclasses import dataclass, field
 from typing import Optional, List
 from contextlib import asynccontextmanager
 
-import torch
-import torchaudio
 from fastapi import FastAPI, HTTPException, Request, Query, Depends
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -35,6 +35,7 @@ start_time = time.time()
 pipe = None   # model
 tok = None    # tokenizer
 model_config = None
+model_error: str | None = None
 
 
 # ═════════════════════════════════════════════════════════
@@ -159,7 +160,7 @@ job_manager: JobManager | None = None
 
 def load_model(model_path: str):
     """加载 Higgs v3 模型（纯 transformers，无 SGLang 依赖）"""
-    global pipe, tok, model_config
+    global pipe, tok, model_config, model_error
     import importlib.util
 
     log.info(f"加载模型：{model_path}")
@@ -168,33 +169,59 @@ def load_model(model_path: str):
     model_dir = Path(model_path)
     config_file = model_dir / "configuration_higgs_multimodal_qwen3.py"
     modeling_file = model_dir / "modeling_higgs_multimodal_qwen3.py"
+    hf_config_file = model_dir / "config.json"
 
-    if not config_file.exists():
-        raise FileNotFoundError(f"缺少 config 文件：{config_file}")
+    missing = [str(p) for p in (config_file, modeling_file, hf_config_file) if not p.exists()]
+    if missing:
+        raise FileNotFoundError(
+            "模型目录不完整，缺少："
+            + ", ".join(missing)
+            + "。请把完整 Higgs 模型权重、tokenizer 和 config.json 放到该目录。"
+        )
+    import torch
 
-    # 导入自定义 configuration 模块
-    spec = importlib.util.spec_from_file_location("higgs_config", config_file)
-    config_mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(config_mod)
+    # 用一个临时 package 名加载 bridge 文件，保证 modeling 里的相对导入可用。
+    package_name = "_higgs_transformers_bridge"
+    if package_name not in sys.modules:
+        pkg = types.ModuleType(package_name)
+        pkg.__path__ = [str(model_dir)]  # type: ignore[attr-defined]
+        sys.modules[package_name] = pkg
+
+    def _load_bridge_module(module_name: str, file_path: Path):
+        full_name = f"{package_name}.{module_name}"
+        spec = importlib.util.spec_from_file_location(full_name, file_path)
+        if spec is None or spec.loader is None:
+            raise ImportError(f"无法加载模块：{file_path}")
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[full_name] = module
+        spec.loader.exec_module(module)
+        return module
+
+    # 导入自定义 configuration / modeling 模块。
+    config_mod = _load_bridge_module("configuration_higgs_multimodal_qwen3", config_file)
     HiggsConfig = config_mod.HiggsMultimodalQwen3Config
-
-    # 导入自定义 modeling 模块
-    spec2 = importlib.util.spec_from_file_location("higgs_modeling", modeling_file)
-    model_mod = importlib.util.module_from_spec(spec2)
-    spec2.loader.exec_module(model_mod)
+    model_mod = _load_bridge_module("modeling_higgs_multimodal_qwen3", modeling_file)
     HiggsModel = model_mod.HiggsMultimodalQwen3ForConditionalGeneration
 
     # 用自定义类直接加载
     from transformers import AutoTokenizer
+    device = os.environ.get("HIGGS_DEVICE", "cuda")
+    if device.startswith("cuda") and not torch.cuda.is_available():
+        raise RuntimeError(
+            "CUDA 不可用：请安装 CUDA 版 PyTorch/正确显卡驱动，"
+            "或设置 HIGGS_DEVICE=cpu 仅用于调试（会很慢）。"
+        )
+    dtype = torch.bfloat16 if device.startswith("cuda") else torch.float32
     model_config = HiggsConfig.from_pretrained(model_path)
     tok = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
     pipe = HiggsModel.from_pretrained(
         model_path,
         config=model_config,
-        torch_dtype=torch.bfloat16,
-    ).to("cuda").eval()
+        torch_dtype=dtype,
+    ).to(device).eval()
+    model_error = None
 
-    log.info(f"✅ 模型加载完成 | sample_rate={model_config.sample_rate}")
+    log.info(f"✅ 模型加载完成 | device={device} | sample_rate={model_config.sample_rate}")
 
 
 # ═════════════════════════════════════════════════════════
@@ -202,12 +229,14 @@ def load_model(model_path: str):
 # ═════════════════════════════════════════════════════════
 
 async def _tts_inference(request: "TTSRequest") -> tuple[str, float, float]:
-    global pipe, tok
+    global pipe, tok, model_config
     if pipe is None: raise RuntimeError("模型未加载")
 
     t0 = time.time()
 
     def _run():
+        import torchaudio
+
         kwargs: dict = {}
 
         # 语音克隆
@@ -242,7 +271,7 @@ async def _tts_inference(request: "TTSRequest") -> tuple[str, float, float]:
         elapsed = time.time() - t0
         return base64.b64encode(audio_bytes).decode("utf-8"), round(duration, 1), round(elapsed, 1)
 
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     return await loop.run_in_executor(None, _run)
 
 
@@ -268,6 +297,7 @@ class HealthResponse(BaseModel):
     uptime_s: float
     queue_length: int = 0
     total_completed: int = 0
+    error: Optional[str] = None
 
 
 # ═════════════════════════════════════════════════════════
@@ -276,16 +306,21 @@ class HealthResponse(BaseModel):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global job_manager
+    global job_manager, model_error
     log.info("=" * 60)
     log.info("🎙️  Higgs Audio v3 TTS 服务（纯 transformers 版）")
     log.info("=" * 60)
 
     model_path = os.environ.get("HIGGS_MODEL_PATH", "./models/higgs-audio-v3-tts-4b")
     if Path(model_path).exists():
-        load_model(model_path)
+        try:
+            load_model(model_path)
+        except Exception as exc:
+            model_error = str(exc)
+            log.exception("⚠️ 模型加载失败，服务将以 degraded 状态启动：%s", exc)
     else:
-        log.warning(f"⚠️ 模型路径不存在：{model_path}")
+        model_error = f"模型路径不存在：{model_path}"
+        log.warning(f"⚠️ {model_error}")
 
     job_manager = JobManager()
     await job_manager.start()
@@ -343,12 +378,21 @@ async def health():
         uptime_s=round(time.time() - start_time, 1),
         queue_length=qs.get("queue_length", 0),
         total_completed=qs.get("total_completed", 0),
+        error=model_error,
     )
 
 
 @app.post("/v1/audio/speech")
 async def create_speech(request: TTSRequest, sync: bool = Query(False),
                         auth=Depends(verify_api_key)):
+    if job_manager is None:
+        raise HTTPException(status_code=503, detail="队列尚未初始化")
+    if pipe is None:
+        detail = "模型未加载，请检查 HIGGS_MODEL_PATH 和模型文件是否完整"
+        if model_error:
+            detail += f"：{model_error}"
+        raise HTTPException(status_code=503, detail=detail)
+
     if sync:
         audio_b64, duration, elapsed = await _tts_inference(request)
         return {"audio_b64_json": audio_b64, "duration_s": duration, "elapsed_s": elapsed}
