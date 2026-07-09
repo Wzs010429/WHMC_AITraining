@@ -32,7 +32,7 @@ parser.add_argument("--fast", action="store_true", help="快速")
 parser.add_argument("-r", "--ref", default=None, help="参考音频路径（语音克隆）")
 parser.add_argument("--ref-text", default=None, help="参考音频对应的文字内容")
 parser.add_argument("--output", default="tts_output.wav", help="输出文件名")
-parser.add_argument("--no-play", action="store_true", help="不自动播放")
+parser.add_argument("--play", action="store_true", help="生成后自动播放")
 args = parser.parse_args()
 
 # 构建带标签的文本
@@ -87,7 +87,7 @@ while True:
         print(f"Saved: {args.output}")
 
         # 自动播放
-        if not args.no_play:
+        if args.play:
             try:
                 os.startfile(args.output)  # Windows
             except AttributeError:
