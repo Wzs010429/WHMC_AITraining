@@ -74,7 +74,15 @@ while True:
 
         # 自动播放
         if not args.no_play:
-            os.startfile(args.output)
+            try:
+                os.startfile(args.output)  # Windows
+            except AttributeError:
+                import platform
+                system = platform.system()
+                if system == "Darwin":
+                    subprocess.run(["open", args.output])
+                else:  # Linux
+                    subprocess.run(["xdg-open", args.output])
         break
     elif j["status"] == "failed":
         print(f"FAIL: {j.get('error')}")
