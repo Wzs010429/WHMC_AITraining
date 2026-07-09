@@ -19,8 +19,10 @@ parser.add_argument("--emotion", default=None, help="情感: joy, sadness, enthu
 parser.add_argument("--sfx", default=None, help="音效: laughter, sigh, sneeze")
 parser.add_argument("--slow", action="store_true", help="慢速朗读")
 parser.add_argument("--fast", action="store_true", help="快速朗读")
+parser.add_argument("-r", "--ref", default=None, help="参考音频路径（语音克隆）")
+parser.add_argument("--ref-text", default=None, help="参考音频对应的文字内容")
 parser.add_argument("--output", default="tts_output.wav", help="输出文件名")
-parser.add_argument("--play", action="store_true", default=True, help="生成后自动播放")
+parser.add_argument("--no-play", action="store_true", help="不自动播放")
 args = parser.parse_args()
 
 # 构建带标签的文本
@@ -36,13 +38,21 @@ if args.fast:
 
 print(f"Text : {text[:80]}...")
 print(f"Temp : {args.temp}")
+if args.ref:
+    print(f"Clone: {args.ref}")
 print()
 
+# 构建请求体
+body = {"input": text, "temperature": args.temp}
+if args.ref:
+    import base64 as _b64
+    with open(args.ref, "rb") as f:
+        body["reference_audio_b64"] = _b64.b64encode(f.read()).decode()
+    if args.ref_text:
+        body["reference_text"] = args.ref_text
+
 # 提交
-r = requests.post(f"{args.url}/v1/audio/speech", json={
-    "input": text,
-    "temperature": args.temp,
-}, timeout=10)
+r = requests.post(f"{args.url}/v1/audio/speech", json=body, timeout=10)
 job = r.json()
 job_id = job["job_id"]
 print(f"job_id: {job_id}  position: {job.get('position','?')}")
@@ -63,7 +73,7 @@ while True:
         print(f"Saved: {args.output}")
 
         # 自动播放
-        if args.play:
+        if not args.no_play:
             os.startfile(args.output)
         break
     elif j["status"] == "failed":
