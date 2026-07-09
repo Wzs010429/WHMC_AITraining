@@ -16,9 +16,11 @@ parser.add_argument("text", help="要合成的文本")
 parser.add_argument("--url", default=BASE, help=f"TTS 服务地址（默认 {BASE}）")
 parser.add_argument("--temp", type=float, default=1.0, help="随机性 (0-2)")
 parser.add_argument("--emotion", default=None, help="情感: joy, sadness, enthusiasm, amusement, fear, surprise")
-parser.add_argument("--sfx", default=None, help="音效: laughter, sigh, sneeze")
-parser.add_argument("--slow", action="store_true", help="慢速朗读")
-parser.add_argument("--fast", action="store_true", help="快速朗读")
+parser.add_argument("--sfx", default=None, help="音效: laughter, sigh, sneeze, cough")
+parser.add_argument("--style", default=None, help="风格: whispering, shouting, singing")
+parser.add_argument("--pitch", default=None, choices=["high","low"], help="音高")
+parser.add_argument("--slow", action="store_true", help="慢速")
+parser.add_argument("--fast", action="store_true", help="快速")
 parser.add_argument("-r", "--ref", default=None, help="参考音频路径（语音克隆）")
 parser.add_argument("--ref-text", default=None, help="参考音频对应的文字内容")
 parser.add_argument("--output", default="tts_output.wav", help="输出文件名")
@@ -31,6 +33,10 @@ if args.emotion:
     text = f"<|emotion:{args.emotion}|>" + text
 if args.sfx:
     text += f"<|sfx:{args.sfx}|>"
+if args.style:
+    text = f"<|style:{args.style}|>" + text
+if args.pitch:
+    text = f"<|prosody:pitch_{args.pitch}|>" + text
 if args.slow:
     text = "<|prosody:speed_slow|>" + text
 if args.fast:
