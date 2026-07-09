@@ -15,9 +15,17 @@ parser = argparse.ArgumentParser(description="一键 TTS")
 parser.add_argument("text", help="要合成的文本")
 parser.add_argument("--url", default=BASE, help=f"TTS 服务地址（默认 {BASE}）")
 parser.add_argument("--temp", type=float, default=1.0, help="随机性 (0-2)")
-parser.add_argument("--emotion", default=None, help="情感: joy, sadness, enthusiasm, amusement, fear, surprise")
-parser.add_argument("--sfx", default=None, help="音效: laughter, sigh, sneeze, cough")
-parser.add_argument("--style", default=None, help="风格: whispering, shouting, singing")
+parser.add_argument("--emotion", default=None,
+    choices=["elation","enthusiasm","amusement","surprise","awe","sadness","fear","anger",
+             "determination","pride","contentment","affection","relief","contemplation",
+             "confusion","longing","disgust","bitterness","shame","helplessness","arousal"],
+    help="情感标签（21种）")
+parser.add_argument("--sfx", default=None,
+    choices=["laughter","sigh","sneeze","cough","crying","screaming","burping","humming","sniff"],
+    help="音效（9种）")
+parser.add_argument("--style", default=None,
+    choices=["whispering","shouting","singing"],
+    help="风格（3种）")
 parser.add_argument("--pitch", default=None, choices=["high","low"], help="音高")
 parser.add_argument("--slow", action="store_true", help="慢速")
 parser.add_argument("--fast", action="store_true", help="快速")
