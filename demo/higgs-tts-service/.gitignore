@@ -3,5 +3,3 @@ output/
 __pycache__/
 tts-env/
 models/
-wheels/
-_tmp_env/
