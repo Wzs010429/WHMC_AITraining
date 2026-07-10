@@ -1,12 +1,39 @@
-# Higgs Audio v3 TTS 推理服务 依赖
-# pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+# ============================================================
+# Higgs Audio v3 TTS 推理服务 —  CUDA 12.6 / conda 环境
+# ============================================================
+# 教学机环境：CUDA 12.6 + Miniconda
+#
+# ── 安装步骤（三步，全程国内镜像）─────────────────────────
+#
+#   1) 建一个全新 conda 环境（Python 3.11）
+#        conda create -n tts python=3.11 -y
+#        conda activate tts
+#
+#   2) 一键安装本文件
+#        pip install -r requirements.txt
+#
+#   3) 完
+#
+# ── 为什么 torch 不走清华源 ───────────────────────────────
+#   清华 PyPI 镜像不提供带 CUDA 的 torch 轮子（只有 CPU 版）。
+#   cu126 轮子改用南京大学镜像。教学机是 CUDA 12.6（GPU 是 A4000）。
+# ============================================================
 
+# ── 镜像源：清华主源（默认）+ 南大 torch cu126 源 ─────────
+--index-url https://pypi.tuna.tsinghua.edu.cn/simple
+--extra-index-url https://mirrors.nju.edu.cn/pytorch/whl/cu126
+
+# ── 深度学习框架（CUDA 12.6，来自南大源）──────────────────
+torch==2.8.0+cu126
+torchaudio==2.8.0+cu126
+
+# ── Web 服务 ──────────────────────────────────────────────
 fastapi>=0.110.0
 uvicorn[standard]>=0.29.0
 pydantic>=2.6.0
-requests>=2.28.0
+
+# ── 模型加载（Higgs Audio v3，纯 transformers，无需 SGLang）─
 transformers>=5.5.0
 
-# PyTorch（自动选择匹配当前 Python 的版本）
-# pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu124
-# 如果 PyTorch 官方连不上，走清华镜像：pip install torch torchaudio -i https://pypi.tuna.tsinghua.edu.cn/simple
+# ── 工具 ──────────────────────────────────────────────────
+requests>=2.28.0

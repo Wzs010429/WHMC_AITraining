@@ -1,12 +1,15 @@
 # ============================================================
 # Higgs Audio v3 TTS 依赖（纯 transformers 版）
-# 不需要 SGLang-Omni
 # ============================================================
 # 安装：
-#   source tts-env/bin/activate
-#   pip install -r requirements-tts.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
-#   pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu124
+#   conda create -n tts python=3.11 -y && conda activate tts
+#   pip install -r requirements-tts.txt
 
+--index-url https://pypi.tuna.tsinghua.edu.cn/simple
+--extra-index-url https://mirrors.nju.edu.cn/pytorch/whl/cu126
+
+torch==2.8.0+cu126
+torchaudio==2.8.0+cu126
 fastapi>=0.110.0
 uvicorn[standard]>=0.29.0
 pydantic>=2.6.0

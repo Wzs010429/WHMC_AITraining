@@ -21,26 +21,25 @@ higgs-tts-service/
 ```bash
 cd higgs-tts-service
 
-# 创建虚拟环境
-python -m venv tts-env
-tts-env\Scripts\activate
+# 创建 conda 环境（Python 3.11，匹配 CUDA 12.6）
+conda create -n tts python=3.11 -y
+conda activate tts
 
-# 安装
-pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
-pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu124
+# 一键安装（清华+南大镜像，自动走 CUDA 12.6）
+pip install -r requirements.txt
 ```
 
 验证：
 
 ```bash
-python -c "import torch; print('CUDA:', torch.cuda.is_available())"
-# 应输出：CUDA: True
+python -c "import torch; print('CUDA:', torch.cuda.is_available()); print(torch.__version__)"
+# 应输出：CUDA: True  2.8.0+cu126
 ```
 
 ## 三、启动服务
 
 ```bash
-tts-env\Scripts\activate
+conda activate tts
 python server.py --model-path ./models/higgs-audio-v3-tts-4b --host 127.0.0.1 --port 8100
 ```
 
