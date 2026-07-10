@@ -1,5 +1,0 @@
-output/
-*.json
-__pycache__/
-tts-env/
-models/
