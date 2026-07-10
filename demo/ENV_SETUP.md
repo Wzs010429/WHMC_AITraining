@@ -45,7 +45,7 @@ cd ~/WHMC_AITraining/demo
 python3 -m venv tts-env
 source tts-env/bin/activate
 pip install -r requirements-tts.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
-pip install torch==2.5.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cu124
+pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu124
 ```
 
 | 包 | 来源 | 用途 |

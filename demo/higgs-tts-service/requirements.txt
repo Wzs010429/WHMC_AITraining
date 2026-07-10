@@ -7,5 +7,6 @@ pydantic>=2.6.0
 requests>=2.28.0
 transformers>=5.5.0
 
-# PyTorch 依赖建议按目标 CUDA 版本单独安装，例如：
-# pip install torch==2.5.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cu124
+# PyTorch（自动选择匹配当前 Python 的版本）
+# pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu124
+# 如果 PyTorch 官方连不上，走清华镜像：pip install torch torchaudio -i https://pypi.tuna.tsinghua.edu.cn/simple
