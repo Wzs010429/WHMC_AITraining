@@ -5,14 +5,11 @@
 
 ## 一、文件清单
 
-管理员提供的文件夹：
-
 ```
 higgs-tts-service/
-├── models/higgs-audio-v3-tts-4b/    ← 模型权重（8.7GB，预先下载好）
+├── models/higgs-audio-v3-tts-4b/    ← 模型权重（服务器已预置）
 ├── server.py                          ← 推理服务
-├── quick_tts.py                       ← 测试脚本
-├── test_client.py                     ← 连通性测试
+├── quick_tts.py                       ← 一键 TTS 工具
 └── requirements.txt                   ← 依赖清单
 ```
 
