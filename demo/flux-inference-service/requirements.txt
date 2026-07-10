@@ -1,36 +1,63 @@
 # ============================================================
-# FLUX.2-klein-9B 推理服务 依赖
+# FLUX.2-klein-9B 推理服务依赖  —  CUDA 12.6 / conda 环境
 # ============================================================
-# 安装：
-#   pip install -r requirements.txt
+# 教学机环境：CUDA 12.6 + Anaconda/Miniconda
 #
-# 如果 diffusers 版本太旧，从 GitHub 安装最新版：
-#   pip install git+https://github.com/huggingface/diffusers.git
+# ── 安装步骤（三步，全程国内镜像）─────────────────────────
 #
-# ModelScope 用户（国内推荐）：
-#   pip install modelscope
+#   1) 建一个全新的 conda 环境（Python 3.11）
+#        conda create -n flux python=3.11 -y
+#        conda activate flux
+#
+#   2) 一键安装本文件
+#        pip install -r requirements.txt
+#      （torch 自动走南大 cu126 源，其余包走清华源，见下方 index 指令）
+#
+#   3) 若第 2 步装的 diffusers 稳定版还不含 Flux2KleinPipeline，
+#      改装 GitHub 主分支版（其余包已装好，这步只补 diffusers）：
+#        pip install "git+https://github.com/huggingface/diffusers.git" \
+#          -i https://pypi.tuna.tsinghua.edu.cn/simple
+#
+# ── 为什么 torch 不走清华源 ───────────────────────────────
+#   清华 PyPI 镜像不提供带 CUDA 的 torch 轮子（只有 CPU 版）。
+#   cu126 轮子改用南京大学镜像。CUDA 版本靠驱动向下兼容：
+#   教学机是 CUDA 12.6，cu126 轮子正好匹配。
+#
+# ── 备用：torch 若下载慢，可换源（任选其一）──────────────
+#   官方：  https://download.pytorch.org/whl/cu126
+#   阿里云：https://mirrors.aliyun.com/pytorch-wheels/cu126
+# ============================================================
 
-# Web 框架
+# ── 镜像源：清华主源（默认）+ 南大 torch cu126 源 ─────────
+--index-url https://pypi.tuna.tsinghua.edu.cn/simple
+--extra-index-url https://mirrors.nju.edu.cn/pytorch/whl/cu126
+
+# ── 深度学习框架（CUDA 12.6，来自南大源）──────────────────
+# 带 +cu126 本地版本号，pip 只会从南大 cu126 源取，不会误装清华的 CPU 版
+torch==2.8.0+cu126
+
+# ── 模型推理 ──────────────────────────────────────────────
+# Flux2KleinPipeline 需 diffusers>=0.38.0；若稳定版没有，见文件头第 3 步装 git 版
+diffusers>=0.38.0
+transformers>=4.51.0          # FLUX.2 用 Qwen3-8B 文本编码器，需较新 transformers
+accelerate>=1.0.0             # CPU offload / 显存调度
+safetensors>=0.4.5
+
+# ── Web 服务 ──────────────────────────────────────────────
 fastapi>=0.110.0
 uvicorn[standard]>=0.29.0
 pydantic>=2.6.0
 
-# 模型推理
-diffusers>=0.32.0
-transformers>=4.46.0
-accelerate>=0.30.0
-torch>=2.4.0
+# ── 图片处理 ──────────────────────────────────────────────
+Pillow>=10.2.0
 
-# 图片处理
-Pillow>=10.0.0
-
-# ModelScope（国内下载模型，可选）
+# ── 模型下载（国内用 ModelScope）──────────────────────────
 modelscope>=1.20.0
+huggingface_hub>=0.25.0
 
-# 工具
-safetensors>=0.4.0
+# ── 工具 ──────────────────────────────────────────────────
 requests>=2.28.0
 
-# 可选：性能优化
-# xformers>=0.0.28    # 显存优化（仅 Linux）
-# bitsandbytes>=0.44  # 4-bit 量化
+# ── 可选：显存优化（需要再解开注释）───────────────────────
+# xformers        # 注意：xformers 也在南大 cu126 源，版本要和 torch 对应
+# bitsandbytes    # 4-bit 量化，进一步省显存
