@@ -1,13 +1,53 @@
 # Higgs Audio v3 TTS — 教师本地部署指南
 
 > 目标机器：Windows + NVIDIA A4000（16GB 显存）
-> 前提：模型文件已由管理员预先拷贝到本机
+> 前提：管理员提供完整离线包（模型 + wheels + 代码）
 
 ---
 
-## 一、确认文件就绪
+## 一、管理员准备离线包（只需做一次）
 
-先检查模型文件夹是否存在，管理员拷贝后路径类似：
+在能联网的 Windows 上：
+
+```bash
+# 1. 双击运行，自动下载全部依赖到 wheels/（~3GB，约 10 分钟）
+download_wheels.bat
+
+# 2. 拷贝整个 higgs-tts-service/ 文件夹给学生
+#    包含：models/(8.7GB) + wheels/(~3GB) + 代码 + install_offline.bat
+```
+
+---
+
+## 二、学生拿到后（3 步，无需联网）
+
+### 1. 确认文件齐全
+
+管理员给的文件结构：
+```
+higgs-tts-service/
+├── models/higgs-audio-v3-tts-4b/    ← 8.7GB 模型
+├── wheels/                            ← ~3GB 离线包
+├── install_offline.bat                ← 双击安装
+├── server.py / quick_tts.py / requirements.txt
+```
+
+### 2. 双击 `install_offline.bat`
+
+自动完成：创建虚拟环境 → 安装全部依赖 → 验证 GPU。
+
+### 3. 启动服务
+
+```bash
+tts-env\Scripts\activate
+python server.py --model-path ./models/higgs-audio-v3-tts-4b --host 127.0.0.1 --port 8100
+```
+
+看到 `Uvicorn running on http://127.0.0.1:8100` 即成功。
+
+---
+
+## 三、原在线安装方式（备选，需联网）
 
 ```
 D:\ai-models\higgs-audio-v3-tts-4b\
